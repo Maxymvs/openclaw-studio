@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CanvasMinimap } from "@/features/canvas/components/CanvasMinimap";
 import { CanvasViewport } from "@/features/canvas/components/CanvasViewport";
 import { HeaderBar } from "@/features/canvas/components/HeaderBar";
-import { zoomAtScreenPoint, zoomToFit } from "@/features/canvas/lib/transform";
+import {
+  screenToWorld,
+  worldToScreen,
+  zoomAtScreenPoint,
+  zoomToFit,
+} from "@/features/canvas/lib/transform";
 import { extractText } from "@/lib/text/extractText";
 import { useGatewayConnection } from "@/lib/gateway/useGatewayConnection";
 import type { EventFrame } from "@/lib/gateway/frames";
@@ -178,6 +183,104 @@ const AgentCanvasPage = () => {
 
   const tiles = useMemo(() => project?.tiles ?? [], [project?.tiles]);
 
+  const computeNewTilePosition = useCallback(
+    (tileSize: { width: number; height: number }) => {
+      if (!project) {
+        return { x: 80, y: 200 };
+      }
+
+      if (viewportSize.width === 0 || viewportSize.height === 0) {
+        const offset = project.tiles.length * 36;
+        return { x: 80 + offset, y: 200 + offset };
+      }
+
+      const safeTop = 140;
+      const edgePadding = 24;
+      const step = 80;
+      const maxRings = 12;
+      const zoom = state.canvas.zoom;
+
+      const minCenterY = safeTop + (tileSize.height * zoom) / 2;
+      const screenCenter = {
+        x: viewportSize.width / 2,
+        y: Math.max(viewportSize.height / 2, minCenterY),
+      };
+      const worldCenter = screenToWorld(state.canvas, screenCenter);
+      const base = {
+        x: worldCenter.x - tileSize.width / 2,
+        y: worldCenter.y - tileSize.height / 2,
+      };
+
+      const rectsOverlap = (
+        a: { x: number; y: number; width: number; height: number },
+        b: { x: number; y: number; width: number; height: number },
+        padding = 0
+      ) => {
+        const ax = a.x - padding;
+        const ay = a.y - padding;
+        const aw = a.width + padding * 2;
+        const ah = a.height + padding * 2;
+        const bx = b.x;
+        const by = b.y;
+        const bw = b.width;
+        const bh = b.height;
+        return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+      };
+
+      const candidateFits = (candidate: { x: number; y: number }) => {
+        const screen = worldToScreen(state.canvas, candidate);
+        const tileWidth = tileSize.width * zoom;
+        const tileHeight = tileSize.height * zoom;
+        return (
+          screen.x >= edgePadding &&
+          screen.y >= safeTop &&
+          screen.x + tileWidth <= viewportSize.width - edgePadding &&
+          screen.y + tileHeight <= viewportSize.height - edgePadding
+        );
+      };
+
+      const candidateOverlaps = (candidate: { x: number; y: number }) => {
+        const rect = {
+          x: candidate.x,
+          y: candidate.y,
+          width: tileSize.width,
+          height: tileSize.height,
+        };
+        return project.tiles.some((tile) =>
+          rectsOverlap(
+            rect,
+            {
+              x: tile.position.x,
+              y: tile.position.y,
+              width: tile.size.width,
+              height: tile.size.height,
+            },
+            24
+          )
+        );
+      };
+
+      for (let ring = 0; ring <= maxRings; ring += 1) {
+        for (let dx = -ring; dx <= ring; dx += 1) {
+          for (let dy = -ring; dy <= ring; dy += 1) {
+            if (ring > 0 && Math.abs(dx) !== ring && Math.abs(dy) !== ring) {
+              continue;
+            }
+            const candidate = {
+              x: base.x + dx * step,
+              y: base.y + dy * step,
+            };
+            if (!candidateFits(candidate)) continue;
+            if (!candidateOverlaps(candidate)) return candidate;
+          }
+        }
+      }
+
+      return base;
+    },
+    [project, state.canvas, viewportSize]
+  );
+
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -200,8 +303,16 @@ const AgentCanvasPage = () => {
     const name = `Agent ${crypto.randomUUID().slice(0, 4)}`;
     const result = await createTile(project.id, name, "coding");
     if (!result) return;
+
+    const nextPosition = computeNewTilePosition(result.tile.size);
+    dispatch({
+      type: "updateTile",
+      projectId: project.id,
+      tileId: result.tile.id,
+      patch: { position: nextPosition },
+    });
     dispatch({ type: "selectTile", tileId: result.tile.id });
-  }, [createTile, dispatch, project]);
+  }, [computeNewTilePosition, createTile, dispatch, project]);
 
   const loadTileHistory = useCallback(
     async (projectId: string, tileId: string) => {
