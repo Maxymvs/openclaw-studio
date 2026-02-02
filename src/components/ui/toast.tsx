@@ -80,26 +80,38 @@ function ToastViewport({
   toasts: ToastRecord[];
   onDismiss: (id: string) => void;
 }) {
-  React.useEffect(() => {
-    if (toasts.length === 0) return;
+  const timersRef = React.useRef<Map<string, number>>(new Map());
 
-    const timers = new Map<string, number>();
+  React.useEffect(() => {
+    const timers = timersRef.current;
+    const activeIds = new Set(toasts.map((toast) => toast.id));
+    for (const [id, handle] of timers.entries()) {
+      if (activeIds.has(id)) continue;
+      window.clearTimeout(handle);
+      timers.delete(id);
+    }
+
     for (const toast of toasts) {
+      if (timers.has(toast.id)) continue;
       const duration = toast.durationMs ?? DEFAULT_DURATION_MS;
       if (duration <= 0) continue;
-      if (timers.has(toast.id)) continue;
       const handle = window.setTimeout(() => {
         onDismiss(toast.id);
+        timers.delete(toast.id);
       }, duration);
       timers.set(toast.id, handle);
     }
+  }, [onDismiss, toasts]);
 
+  React.useEffect(() => {
     return () => {
+      const timers = timersRef.current;
       for (const handle of timers.values()) {
         window.clearTimeout(handle);
       }
+      timers.clear();
     };
-  }, [onDismiss, toasts]);
+  }, []);
 
   return (
     <div
