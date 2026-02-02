@@ -53,3 +53,6 @@ test-results
 /.moltbot
 /agent-canvas
 /worktrees
+
+# Local Beads (issue tracker)
+.beads/
