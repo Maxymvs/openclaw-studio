@@ -1,0 +1,13 @@
+# Dashboard Pages Progress
+
+## Completed Stories
+- DASH-001: Shared: WebSocket event subscription hook (commit 073fac4)
+  - Created `src/lib/gateway/useGatewayEvents.ts` — reusable hook accepting GatewayClient, filter (string/array/predicate/null), and callback
+  - 6 unit tests covering: subscribe/unsubscribe lifecycle, null filter, string filter, array filter, predicate filter, null client
+
+## Codebase Patterns
+- GatewayClient lives in `src/lib/gateway/GatewayClient.ts`, exposes `onEvent(handler)` returning unsubscribe fn
+- Client is created via `useGatewayConnection()` hook in page.tsx — not in a React context (yet)
+- Tests go in `tests/unit/*.test.ts`, use vitest + jsdom + @testing-library/react
+- Mock GatewayClient by creating object with `onEvent: vi.fn()` and casting as `unknown as GatewayClient`
+- Type vi.fn callbacks explicitly to pass tsc: `vi.fn<(e: EventFrame) => void>()`
