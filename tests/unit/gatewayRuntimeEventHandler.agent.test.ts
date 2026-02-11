@@ -58,6 +58,7 @@ describe("gateway runtime event handler (agent)", () => {
       getAgents: () => agents,
       dispatch: vi.fn(),
       queueLivePatch,
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -111,6 +112,7 @@ describe("gateway runtime event handler (agent)", () => {
       getAgents: () => agents,
       dispatch: vi.fn(),
       queueLivePatch,
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -165,6 +167,7 @@ describe("gateway runtime event handler (agent)", () => {
         actions.push(action as never);
       }),
       queueLivePatch: vi.fn(),
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -207,6 +210,7 @@ describe("gateway runtime event handler (agent)", () => {
   it("applies lifecycle transitions and appends final stream text when no chat events", () => {
     const agents = [createAgent({ streamText: "final text", runId: "run-4" })];
     const actions: Array<{ type: string; agentId: string; line?: string; patch?: unknown }> = [];
+    const clearPendingLivePatch = vi.fn();
     const handler = createGatewayRuntimeEventHandler({
       getStatus: () => "connected",
       getAgents: () => agents,
@@ -214,6 +218,7 @@ describe("gateway runtime event handler (agent)", () => {
         actions.push(action as never);
       }),
       queueLivePatch: vi.fn(),
+      clearPendingLivePatch,
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -273,5 +278,6 @@ describe("gateway runtime event handler (agent)", () => {
         return patch.status === "idle" && patch.runId === null;
       })
     ).toBe(true);
+    expect(clearPendingLivePatch).toHaveBeenCalledWith("agent-1");
   });
 });

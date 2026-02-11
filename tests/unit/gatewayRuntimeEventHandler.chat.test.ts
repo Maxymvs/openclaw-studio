@@ -60,6 +60,7 @@ describe("gateway runtime event handler (chat)", () => {
       getAgents: () => agents,
       dispatch,
       queueLivePatch,
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -105,6 +106,7 @@ describe("gateway runtime event handler (chat)", () => {
       getAgents: () => agents,
       dispatch,
       queueLivePatch,
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -146,12 +148,14 @@ describe("gateway runtime event handler (chat)", () => {
       dispatched.push(action as never);
     });
     const updateSpecialLatestUpdate = vi.fn();
+    const clearPendingLivePatch = vi.fn();
 
     const handler = createGatewayRuntimeEventHandler({
       getStatus: () => "connected",
       getAgents: () => agents,
       dispatch,
       queueLivePatch: vi.fn(),
+      clearPendingLivePatch,
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -203,6 +207,7 @@ describe("gateway runtime event handler (chat)", () => {
 
     expect(updateSpecialLatestUpdate).toHaveBeenCalledTimes(1);
     expect(updateSpecialLatestUpdate).toHaveBeenCalledWith("agent-1", agents[0], "hello");
+    expect(clearPendingLivePatch).toHaveBeenCalledWith("agent-1");
   });
 
   it("requests agent history load when final assistant has no thinking trace and no prior trace output", () => {
@@ -213,6 +218,7 @@ describe("gateway runtime event handler (chat)", () => {
       getAgents: () => agents,
       dispatch: vi.fn(),
       queueLivePatch: vi.fn(),
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory,
@@ -261,6 +267,7 @@ describe("gateway runtime event handler (chat)", () => {
       getAgents: () => agents,
       dispatch,
       queueLivePatch: vi.fn(),
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),
@@ -300,6 +307,7 @@ describe("gateway runtime event handler (chat)", () => {
       getAgents: () => agents,
       dispatch,
       queueLivePatch: vi.fn(),
+      clearPendingLivePatch: vi.fn(),
       now: () => 1000,
       loadSummarySnapshot: vi.fn(async () => {}),
       loadAgentHistory: vi.fn(async () => {}),

@@ -376,6 +376,17 @@ const AgentStudioPage = () => {
     livePatchBatcherRef.current.schedule();
   }, []);
 
+  const clearPendingLivePatch = useCallback((agentId: string) => {
+    const key = agentId.trim();
+    if (!key) return;
+    const pending = pendingLivePatchesRef.current;
+    if (!pending.has(key)) return;
+    pending.delete(key);
+    if (pending.size === 0) {
+      livePatchBatcherRef.current.cancel();
+    }
+  }, []);
+
   useEffect(() => {
     const selector = 'link[data-agent-favicon="true"]';
     const existing = document.querySelector(selector) as HTMLLinkElement | null;
@@ -1551,6 +1562,7 @@ const AgentStudioPage = () => {
       getAgents: () => stateRef.current.agents,
       dispatch,
       queueLivePatch,
+      clearPendingLivePatch,
       loadSummarySnapshot,
       loadAgentHistory,
       refreshHeartbeatLatestUpdate,
@@ -1575,6 +1587,7 @@ const AgentStudioPage = () => {
     dispatch,
     loadAgentHistory,
     loadSummarySnapshot,
+    clearPendingLivePatch,
     queueLivePatch,
     refreshHeartbeatLatestUpdate,
     status,

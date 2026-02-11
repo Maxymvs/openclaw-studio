@@ -36,6 +36,7 @@ export type GatewayRuntimeEventHandlerDeps = {
   getAgents: () => AgentState[];
   dispatch: (action: RuntimeDispatchAction) => void;
   queueLivePatch: (agentId: string, patch: Partial<AgentState>) => void;
+  clearPendingLivePatch: (agentId: string) => void;
   now?: () => number;
 
   loadSummarySnapshot: () => Promise<void>;
@@ -188,6 +189,7 @@ export function createGatewayRuntimeEventHandler(
     ((message: string, meta?: unknown) => {
       console.warn(message, meta);
     });
+  const clearPendingLivePatch = deps.clearPendingLivePatch;
 
   const dispose = () => {
     if (summaryRefreshTimer !== null) {
@@ -270,6 +272,7 @@ export function createGatewayRuntimeEventHandler(
         clearRunTracking(payload.runId);
         return;
       }
+      clearPendingLivePatch(agentId);
       clearRunTracking(payload.runId ?? null);
       if (!nextThinking && role === "assistant" && !thinkingDebugBySession.has(payload.sessionKey)) {
         thinkingDebugBySession.add(payload.sessionKey);
@@ -360,6 +363,7 @@ export function createGatewayRuntimeEventHandler(
         clearRunTracking(payload.runId);
         return;
       }
+      clearPendingLivePatch(agentId);
       clearRunTracking(payload.runId ?? null);
       deps.dispatch({
         type: "appendOutput",
@@ -388,6 +392,7 @@ export function createGatewayRuntimeEventHandler(
         clearRunTracking(payload.runId);
         return;
       }
+      clearPendingLivePatch(agentId);
       clearRunTracking(payload.runId ?? null);
       deps.dispatch({
         type: "appendOutput",
@@ -565,6 +570,9 @@ export function createGatewayRuntimeEventHandler(
       lastActivityAt: summaryPatch.lastActivityAt ?? now(),
     });
     if (transition.kind === "ignore") return;
+    if (transition.kind === "terminal") {
+      clearPendingLivePatch(match);
+    }
     if (phase === "end" && !hasChatEvents) {
       const finalText = agent.streamText?.trim();
       if (finalText) {
