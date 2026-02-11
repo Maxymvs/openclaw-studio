@@ -20,3 +20,9 @@
 - For React component tests (.tsx), use cleanup() in afterEach to avoid duplicate element issues
 - Use `vi.mock("next/navigation", ...)` to mock usePathname in nav tests
 - vitest config includes `{ts,tsx}` for test files
+
+- DASH-003: Shared: Gateway connection context for sub-pages (commit 56610d3)
+  - Created `src/lib/gateway/GatewayConnectionContext.tsx` — GatewayConnectionProvider + useGatewayConnectionContext hook
+  - Provider wraps app in layout.tsx, exposes client, status, gatewayUrl, token, settingsCoordinator
+  - Updated page.tsx to consume context instead of calling useGatewayConnection directly
+  - 4 unit tests: provides client/status, provides functions, throws outside provider, exposes coordinator
