@@ -1,5 +1,9 @@
 import type { AgentState } from "@/features/agents/state/store";
 import {
+  logTranscriptDebugMetric,
+  type TranscriptAppendMeta,
+} from "@/features/agents/state/transcript";
+import {
   classifyGatewayEventKind,
   dedupeRunLines,
   getAgentSummaryPatch,
@@ -28,7 +32,7 @@ import {
 
 type RuntimeDispatchAction =
   | { type: "updateAgent"; agentId: string; patch: Partial<AgentState> }
-  | { type: "appendOutput"; agentId: string; line: string }
+  | { type: "appendOutput"; agentId: string; line: string; transcript?: TranscriptAppendMeta }
   | { type: "markActivity"; agentId: string; at?: number };
 
 export type GatewayRuntimeEventHandlerDeps = {
@@ -142,22 +146,73 @@ export function createGatewayRuntimeEventHandler(
   deps: GatewayRuntimeEventHandlerDeps
 ): GatewayRuntimeEventHandler {
   const now = deps.now ?? (() => Date.now());
+  const CLOSED_RUN_TTL_MS = 30_000;
   const chatRunSeen = new Set<string>();
   const assistantStreamByRun = new Map<string, string>();
   const thinkingStreamByRun = new Map<string, string>();
   const thinkingStartedAtByRun = new Map<string, number>();
   const toolLinesSeenByRun = new Map<string, Set<string>>();
+  const closedRunExpiresByRun = new Map<string, number>();
   const terminalChatRunSeen = new Set<string>();
   const thinkingDebugBySession = new Set<string>();
   const lastActivityMarkByAgent = new Map<string, number>();
 
   let summaryRefreshTimer: number | null = null;
 
-  const appendUniqueToolLines = (agentId: string, runId: string | null | undefined, lines: string[]) => {
+  const dispatchOutput = (
+    agentId: string,
+    line: string,
+    transcript?: TranscriptAppendMeta
+  ) => {
+    deps.dispatch({ type: "appendOutput", agentId, line, transcript });
+  };
+
+  const pruneClosedRuns = (at: number = now()) => {
+    for (const [runId, expiresAt] of closedRunExpiresByRun.entries()) {
+      if (expiresAt <= at) {
+        closedRunExpiresByRun.delete(runId);
+      }
+    }
+  };
+
+  const markRunClosed = (runId?: string | null) => {
+    const key = runId?.trim() ?? "";
+    if (!key) return;
+    closedRunExpiresByRun.set(key, now() + CLOSED_RUN_TTL_MS);
+  };
+
+  const isClosedRun = (runId?: string | null) => {
+    const key = runId?.trim() ?? "";
+    if (!key) return false;
+    const expiresAt = closedRunExpiresByRun.get(key);
+    if (typeof expiresAt !== "number") return false;
+    if (expiresAt <= now()) {
+      closedRunExpiresByRun.delete(key);
+      return false;
+    }
+    return true;
+  };
+
+  const appendUniqueToolLines = (params: {
+    agentId: string;
+    runId: string | null | undefined;
+    sessionKey: string | null | undefined;
+    source: "runtime-chat" | "runtime-agent";
+    timestampMs?: number;
+    lines: string[];
+  }) => {
+    const { agentId, runId, sessionKey, source, timestampMs, lines } = params;
     if (lines.length === 0) return;
     if (!runId) {
       for (const line of lines) {
-        deps.dispatch({ type: "appendOutput", agentId, line });
+        dispatchOutput(agentId, line, {
+          source,
+          runId: null,
+          sessionKey: sessionKey ?? undefined,
+          timestampMs,
+          kind: "tool",
+          role: "tool",
+        });
       }
       return;
     }
@@ -165,7 +220,14 @@ export function createGatewayRuntimeEventHandler(
     const { appended, nextSeen } = dedupeRunLines(current, lines);
     toolLinesSeenByRun.set(runId, nextSeen);
     for (const line of appended) {
-      deps.dispatch({ type: "appendOutput", agentId, line });
+      dispatchOutput(agentId, line, {
+        source,
+        runId,
+        sessionKey: sessionKey ?? undefined,
+        timestampMs,
+        kind: "tool",
+        role: "tool",
+      });
     }
   };
 
@@ -211,6 +273,7 @@ export function createGatewayRuntimeEventHandler(
     assistantStreamByRun.clear();
     thinkingStreamByRun.clear();
     toolLinesSeenByRun.clear();
+    closedRunExpiresByRun.clear();
     terminalChatRunSeen.clear();
     thinkingDebugBySession.clear();
     lastActivityMarkByAgent.clear();
@@ -218,6 +281,19 @@ export function createGatewayRuntimeEventHandler(
 
   const handleRuntimeChatEvent = (payload: ChatEventPayload) => {
     if (!payload.sessionKey) return;
+    pruneClosedRuns();
+    if (
+      payload.runId &&
+      payload.state === "delta" &&
+      isClosedRun(payload.runId)
+    ) {
+      logTranscriptDebugMetric("late_event_ignored_closed_run", {
+        stream: "chat",
+        state: payload.state,
+        runId: payload.runId,
+      });
+      return;
+    }
 
     if (payload.runId) {
       chatRunSeen.add(payload.runId);
@@ -266,7 +342,14 @@ export function createGatewayRuntimeEventHandler(
       if (typeof nextTextRaw === "string" && isUiMetadataPrefix(nextTextRaw.trim())) {
         return;
       }
-      appendUniqueToolLines(agentId, payload.runId ?? null, toolLines);
+      appendUniqueToolLines({
+        agentId,
+        runId: payload.runId ?? null,
+        sessionKey: payload.sessionKey,
+        source: "runtime-chat",
+        timestampMs: now(),
+        lines: toolLines,
+      });
       const patch: Partial<AgentState> = {};
       if (nextThinking) {
         if (payload.runId && !thinkingStartedAtByRun.has(payload.runId)) {
@@ -301,6 +384,7 @@ export function createGatewayRuntimeEventHandler(
         markTerminalRunSeen(payload.runId);
       }
       clearRunTracking(payload.runId ?? null);
+      markRunClosed(payload.runId ?? null);
       if (!nextThinking && role === "assistant" && !thinkingDebugBySession.has(payload.sessionKey)) {
         thinkingDebugBySession.add(payload.sessionKey);
         logWarn("No thinking trace extracted from chat event.", {
@@ -323,25 +407,42 @@ export function createGatewayRuntimeEventHandler(
             ? Math.max(0, assistantCompletionAt - startedAt)
             : null;
         if (typeof assistantCompletionAt === "number") {
-          deps.dispatch({
-            type: "appendOutput",
+          dispatchOutput(
             agentId,
-            line: formatMetaMarkdown({
+            formatMetaMarkdown({
               role: "assistant",
               timestamp: assistantCompletionAt,
               thinkingDurationMs,
             }),
-          });
+            {
+              source: "runtime-chat",
+              runId: payload.runId ?? null,
+              sessionKey: payload.sessionKey,
+              timestampMs: assistantCompletionAt,
+              role: "assistant",
+              kind: "meta",
+            }
+          );
         }
       }
       if (thinkingLine) {
-        deps.dispatch({
-          type: "appendOutput",
-          agentId,
-          line: thinkingLine,
+        dispatchOutput(agentId, thinkingLine, {
+          source: "runtime-chat",
+          runId: payload.runId ?? null,
+          sessionKey: payload.sessionKey,
+          timestampMs: assistantCompletionAt ?? now(),
+          role: "assistant",
+          kind: "thinking",
         });
       }
-      appendUniqueToolLines(agentId, payload.runId ?? null, toolLines);
+      appendUniqueToolLines({
+        agentId,
+        runId: payload.runId ?? null,
+        sessionKey: payload.sessionKey,
+        source: "runtime-chat",
+        timestampMs: assistantCompletionAt ?? now(),
+        lines: toolLines,
+      });
       if (
         !thinkingLine &&
         role === "assistant" &&
@@ -351,10 +452,13 @@ export function createGatewayRuntimeEventHandler(
         void deps.loadAgentHistory(agentId);
       }
       if (!isToolRole && typeof nextText === "string") {
-        deps.dispatch({
-          type: "appendOutput",
-          agentId,
-          line: nextText,
+        dispatchOutput(agentId, nextText, {
+          source: "runtime-chat",
+          runId: payload.runId ?? null,
+          sessionKey: payload.sessionKey,
+          timestampMs: assistantCompletionAt ?? now(),
+          role: "assistant",
+          kind: "assistant",
         });
         deps.dispatch({
           type: "updateAgent",
@@ -398,10 +502,14 @@ export function createGatewayRuntimeEventHandler(
         markTerminalRunSeen(payload.runId);
       }
       clearRunTracking(payload.runId ?? null);
-      deps.dispatch({
-        type: "appendOutput",
-        agentId,
-        line: "Run aborted.",
+      markRunClosed(payload.runId ?? null);
+      dispatchOutput(agentId, "Run aborted.", {
+        source: "runtime-chat",
+        runId: payload.runId ?? null,
+        sessionKey: payload.sessionKey,
+        timestampMs: now(),
+        role: "assistant",
+        kind: "assistant",
       });
       const patch: Partial<AgentState> = {
         streamText: null,
@@ -433,11 +541,19 @@ export function createGatewayRuntimeEventHandler(
         markTerminalRunSeen(payload.runId);
       }
       clearRunTracking(payload.runId ?? null);
-      deps.dispatch({
-        type: "appendOutput",
+      markRunClosed(payload.runId ?? null);
+      dispatchOutput(
         agentId,
-        line: payload.errorMessage ? `Error: ${payload.errorMessage}` : "Run error.",
-      });
+        payload.errorMessage ? `Error: ${payload.errorMessage}` : "Run error.",
+        {
+          source: "runtime-chat",
+          runId: payload.runId ?? null,
+          sessionKey: payload.sessionKey,
+          timestampMs: now(),
+          role: "assistant",
+          kind: "assistant",
+        }
+      );
       const patch: Partial<AgentState> = {
         streamText: null,
         thinkingTrace: null,
@@ -457,6 +573,7 @@ export function createGatewayRuntimeEventHandler(
 
   const handleRuntimeAgentEvent = (payload: AgentEventPayload) => {
     if (!payload.runId) return;
+    pruneClosedRuns();
     const agentsSnapshot = deps.getAgents();
     const directMatch = payload.sessionKey ? findAgentBySessionKey(agentsSnapshot, payload.sessionKey) : null;
     const match = directMatch ?? findAgentByRunId(agentsSnapshot, payload.runId);
@@ -467,6 +584,13 @@ export function createGatewayRuntimeEventHandler(
     const data =
       payload.data && typeof payload.data === "object" ? (payload.data as Record<string, unknown>) : null;
     const phase = typeof data?.phase === "string" ? data.phase : "";
+    if (!(phase === "start" && payload.stream === "lifecycle") && isClosedRun(payload.runId)) {
+      logTranscriptDebugMetric("late_event_ignored_closed_run", {
+        stream: payload.stream,
+        runId: payload.runId,
+      });
+      return;
+    }
     const activeRunId = agent.runId?.trim() ?? "";
 
     if (activeRunId && activeRunId !== payload.runId) {
@@ -552,7 +676,7 @@ export function createGatewayRuntimeEventHandler(
         if (
           cleaned &&
           shouldPublishAssistantStream({
-            mergedRaw,
+            nextText: cleaned,
             rawText,
             hasChatEvents,
             currentStreamText: agent.streamText ?? null,
@@ -582,7 +706,14 @@ export function createGatewayRuntimeEventHandler(
           arguments: args,
         });
         if (line) {
-          appendUniqueToolLines(match, payload.runId, [line]);
+          appendUniqueToolLines({
+            agentId: match,
+            runId: payload.runId,
+            sessionKey: payload.sessionKey ?? agent.sessionKey,
+            source: "runtime-agent",
+            timestampMs: now(),
+            lines: [line],
+          });
         }
         return;
       }
@@ -608,7 +739,14 @@ export function createGatewayRuntimeEventHandler(
         details,
         content,
       };
-      appendUniqueToolLines(match, payload.runId, extractToolLines(message));
+      appendUniqueToolLines({
+        agentId: match,
+        runId: payload.runId,
+        sessionKey: payload.sessionKey ?? agent.sessionKey,
+        source: "runtime-agent",
+        timestampMs: now(),
+        lines: extractToolLines(message),
+      });
       return;
     }
 
@@ -635,19 +773,29 @@ export function createGatewayRuntimeEventHandler(
           typeof startedAt === "number"
             ? Math.max(0, assistantCompletionAt - startedAt)
             : null;
-        deps.dispatch({
-          type: "appendOutput",
-          agentId: match,
-          line: formatMetaMarkdown({
+        dispatchOutput(
+          match,
+          formatMetaMarkdown({
             role: "assistant",
             timestamp: assistantCompletionAt,
             thinkingDurationMs,
           }),
-        });
-        deps.dispatch({
-          type: "appendOutput",
-          agentId: match,
-          line: finalText,
+          {
+            source: "runtime-agent",
+            runId: payload.runId,
+            sessionKey: payload.sessionKey ?? agent.sessionKey,
+            timestampMs: assistantCompletionAt,
+            role: "assistant",
+            kind: "meta",
+          }
+        );
+        dispatchOutput(match, finalText, {
+          source: "runtime-agent",
+          runId: payload.runId,
+          sessionKey: payload.sessionKey ?? agent.sessionKey,
+          timestampMs: assistantCompletionAt,
+          role: "assistant",
+          kind: "assistant",
         });
         deps.dispatch({
           type: "updateAgent",
@@ -660,6 +808,7 @@ export function createGatewayRuntimeEventHandler(
       }
     }
     if (transition.clearRunTracking) {
+      markRunClosed(payload.runId);
       clearRunTracking(payload.runId);
     }
     deps.dispatch({

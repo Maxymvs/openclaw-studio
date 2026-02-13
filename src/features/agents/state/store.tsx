@@ -8,6 +8,16 @@ import {
   useReducer,
   type ReactNode,
 } from "react";
+import {
+  areTranscriptEntriesEqual,
+  buildOutputLinesFromTranscriptEntries,
+  buildTranscriptEntriesFromLines,
+  createTranscriptEntryFromLine,
+  sortTranscriptEntries,
+  TRANSCRIPT_V2_ENABLED,
+  type TranscriptAppendMeta,
+  type TranscriptEntry,
+} from "@/features/agents/state/transcript";
 
 export type AgentStatus = "idle" | "running" | "error";
 export type FocusFilter = "all" | "running" | "idle";
@@ -20,6 +30,9 @@ export type AgentStoreSeed = {
   avatarUrl?: string | null;
   model?: string | null;
   thinkingLevel?: string | null;
+  sessionExecHost?: "sandbox" | "gateway" | "node";
+  sessionExecSecurity?: "deny" | "allowlist" | "full";
+  sessionExecAsk?: "off" | "on-miss" | "always";
   toolCallingEnabled?: boolean;
   showThinkingTraces?: boolean;
 };
@@ -50,6 +63,12 @@ export type AgentState = AgentStoreSeed & {
   historyMaybeTruncated: boolean;
   toolCallingEnabled: boolean;
   showThinkingTraces: boolean;
+  transcriptEntries?: TranscriptEntry[];
+  transcriptRevision?: number;
+  transcriptSequenceCounter?: number;
+  sessionEpoch?: number;
+  lastHistoryRequestRevision?: number | null;
+  lastAppliedHistoryRequestId?: string | null;
 };
 
 export const buildNewSessionAgentPatch = (agent: AgentState): Partial<AgentState> => {
@@ -78,6 +97,12 @@ export const buildNewSessionAgentPatch = (agent: AgentState): Partial<AgentState
     hasUnseenActivity: false,
     sessionCreated: true,
     sessionSettingsSynced: true,
+    transcriptEntries: [],
+    transcriptRevision: (agent.transcriptRevision ?? 0) + 1,
+    transcriptSequenceCounter: 0,
+    sessionEpoch: (agent.sessionEpoch ?? 0) + 1,
+    lastHistoryRequestRevision: null,
+    lastAppliedHistoryRequestId: null,
   };
 };
 
@@ -93,7 +118,7 @@ type Action =
   | { type: "setError"; error: string | null }
   | { type: "setLoading"; loading: boolean }
   | { type: "updateAgent"; agentId: string; patch: Partial<AgentState> }
-  | { type: "appendOutput"; agentId: string; line: string }
+  | { type: "appendOutput"; agentId: string; line: string; transcript?: TranscriptAppendMeta }
   | { type: "markActivity"; agentId: string; at?: number }
   | { type: "selectAgent"; agentId: string | null };
 
@@ -104,22 +129,66 @@ const initialState: AgentStoreState = {
   error: null,
 };
 
+const areStringArraysEqual = (left: string[], right: string[]): boolean => {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+};
+
+const ensureTranscriptEntries = (agent: AgentState): TranscriptEntry[] => {
+  if (Array.isArray(agent.transcriptEntries)) {
+    return agent.transcriptEntries;
+  }
+  return buildTranscriptEntriesFromLines({
+    lines: agent.outputLines,
+    sessionKey: agent.sessionKey,
+    source: "legacy",
+    startSequence: 0,
+    confirmed: true,
+  });
+};
+
+const nextTranscriptSequenceCounter = (
+  currentCounter: number | undefined,
+  entries: TranscriptEntry[]
+): number => {
+  const derived = entries.reduce((max, entry) => Math.max(max, entry.sequenceKey + 1), 0);
+  return Math.max(currentCounter ?? 0, derived);
+};
+
 const createRuntimeAgentState = (
   seed: AgentStoreSeed,
   existing?: AgentState | null
 ): AgentState => {
   const sameSessionKey = existing?.sessionKey === seed.sessionKey;
+  const outputLines = sameSessionKey ? (existing?.outputLines ?? []) : [];
+  const transcriptEntries = sameSessionKey
+    ? Array.isArray(existing?.transcriptEntries)
+      ? existing.transcriptEntries
+      : buildTranscriptEntriesFromLines({
+          lines: outputLines,
+          sessionKey: seed.sessionKey,
+          source: "legacy",
+          startSequence: 0,
+          confirmed: true,
+        })
+    : [];
   return {
     ...seed,
     avatarSeed: seed.avatarSeed ?? existing?.avatarSeed ?? seed.agentId,
     avatarUrl: seed.avatarUrl ?? existing?.avatarUrl ?? null,
     model: seed.model ?? existing?.model ?? null,
     thinkingLevel: seed.thinkingLevel ?? existing?.thinkingLevel ?? "high",
+    sessionExecHost: seed.sessionExecHost ?? existing?.sessionExecHost,
+    sessionExecSecurity: seed.sessionExecSecurity ?? existing?.sessionExecSecurity,
+    sessionExecAsk: seed.sessionExecAsk ?? existing?.sessionExecAsk,
     status: sameSessionKey ? (existing?.status ?? "idle") : "idle",
     sessionCreated: sameSessionKey ? (existing?.sessionCreated ?? false) : false,
     awaitingUserInput: sameSessionKey ? (existing?.awaitingUserInput ?? false) : false,
     hasUnseenActivity: sameSessionKey ? (existing?.hasUnseenActivity ?? false) : false,
-    outputLines: sameSessionKey ? (existing?.outputLines ?? []) : [],
+    outputLines,
     lastResult: sameSessionKey ? (existing?.lastResult ?? null) : null,
     lastDiff: sameSessionKey ? (existing?.lastDiff ?? null) : null,
     runId: sameSessionKey ? (existing?.runId ?? null) : null,
@@ -140,6 +209,23 @@ const createRuntimeAgentState = (
     historyMaybeTruncated: sameSessionKey ? (existing?.historyMaybeTruncated ?? false) : false,
     toolCallingEnabled: seed.toolCallingEnabled ?? existing?.toolCallingEnabled ?? false,
     showThinkingTraces: seed.showThinkingTraces ?? existing?.showThinkingTraces ?? true,
+    transcriptEntries,
+    transcriptRevision: sameSessionKey
+      ? (existing?.transcriptRevision ?? outputLines.length)
+      : 0,
+    transcriptSequenceCounter: sameSessionKey
+      ? (existing?.transcriptSequenceCounter ??
+        nextTranscriptSequenceCounter(existing?.transcriptSequenceCounter, transcriptEntries))
+      : 0,
+    sessionEpoch: sameSessionKey
+      ? (existing?.sessionEpoch ?? 0)
+      : (existing?.sessionEpoch ?? 0) + 1,
+    lastHistoryRequestRevision: sameSessionKey
+      ? (existing?.lastHistoryRequestRevision ?? null)
+      : null,
+    lastAppliedHistoryRequestId: sameSessionKey
+      ? (existing?.lastAppliedHistoryRequestId ?? null)
+      : null,
   };
 };
 
@@ -169,20 +255,109 @@ const reducer = (state: AgentStoreState, action: Action): AgentStoreState => {
     case "updateAgent":
       return {
         ...state,
-        agents: state.agents.map((agent) =>
-          agent.agentId === action.agentId
-            ? { ...agent, ...action.patch }
-            : agent
-        ),
+        agents: state.agents.map((agent) => {
+          if (agent.agentId !== action.agentId) return agent;
+          const patch = action.patch;
+          const nextSessionKey = (patch.sessionKey ?? agent.sessionKey).trim();
+          const sessionKeyChanged = nextSessionKey !== agent.sessionKey.trim();
+
+          const existingEntries = ensureTranscriptEntries(agent);
+          const base: AgentState = { ...agent, ...patch };
+          let nextEntries = Array.isArray(base.transcriptEntries)
+            ? [...base.transcriptEntries]
+            : existingEntries;
+          let nextOutputLines = Array.isArray(base.outputLines)
+            ? [...base.outputLines]
+            : [...agent.outputLines];
+          let transcriptMutated = false;
+
+          if (Array.isArray(patch.transcriptEntries)) {
+            const normalized = TRANSCRIPT_V2_ENABLED
+              ? sortTranscriptEntries(patch.transcriptEntries)
+              : [...patch.transcriptEntries];
+            transcriptMutated = !areTranscriptEntriesEqual(existingEntries, normalized);
+            nextEntries = normalized;
+            nextOutputLines = buildOutputLinesFromTranscriptEntries(normalized);
+          } else if (Array.isArray(patch.outputLines)) {
+            const rebuilt = buildTranscriptEntriesFromLines({
+              lines: patch.outputLines,
+              sessionKey: nextSessionKey || agent.sessionKey,
+              source: "legacy",
+              startSequence: 0,
+              confirmed: true,
+            });
+            const normalized = TRANSCRIPT_V2_ENABLED ? sortTranscriptEntries(rebuilt) : rebuilt;
+            transcriptMutated = !areStringArraysEqual(agent.outputLines, patch.outputLines);
+            nextEntries = normalized;
+            nextOutputLines = TRANSCRIPT_V2_ENABLED
+              ? buildOutputLinesFromTranscriptEntries(normalized)
+              : [...patch.outputLines];
+          }
+
+          const revision = transcriptMutated
+            ? (agent.transcriptRevision ?? 0) + 1
+            : (patch.transcriptRevision ?? agent.transcriptRevision ?? 0);
+          const nextCounter = nextTranscriptSequenceCounter(
+            base.transcriptSequenceCounter,
+            nextEntries
+          );
+
+          return {
+            ...base,
+            outputLines: nextOutputLines,
+            transcriptEntries: nextEntries,
+            transcriptRevision: revision,
+            transcriptSequenceCounter: nextCounter,
+            sessionEpoch:
+              patch.sessionEpoch !== undefined
+                ? patch.sessionEpoch
+                : sessionKeyChanged
+                  ? (agent.sessionEpoch ?? 0) + 1
+                  : (agent.sessionEpoch ?? 0),
+          };
+        }),
       };
     case "appendOutput":
       return {
         ...state,
-        agents: state.agents.map((agent) =>
-          agent.agentId === action.agentId
-            ? { ...agent, outputLines: [...agent.outputLines, action.line] }
-            : agent
-        ),
+        agents: state.agents.map((agent) => {
+          if (agent.agentId !== action.agentId) return agent;
+          const existingEntries = ensureTranscriptEntries(agent);
+          const nextSequence = nextTranscriptSequenceCounter(
+            agent.transcriptSequenceCounter,
+            existingEntries
+          );
+          const nextEntry = createTranscriptEntryFromLine({
+            line: action.line,
+            sessionKey: action.transcript?.sessionKey ?? agent.sessionKey,
+            source: action.transcript?.source ?? "legacy",
+            runId: action.transcript?.runId ?? agent.runId,
+            timestampMs: action.transcript?.timestampMs,
+            fallbackTimestampMs: action.transcript?.timestampMs ?? Date.now(),
+            role: action.transcript?.role,
+            kind: action.transcript?.kind,
+            entryId: action.transcript?.entryId,
+            confirmed: action.transcript?.confirmed,
+            sequenceKey: nextSequence,
+          });
+          if (!nextEntry) {
+            return { ...agent, outputLines: [...agent.outputLines, action.line] };
+          }
+          const appended = [...existingEntries, nextEntry];
+          const nextEntries = TRANSCRIPT_V2_ENABLED ? sortTranscriptEntries(appended) : appended;
+          return {
+            ...agent,
+            outputLines: TRANSCRIPT_V2_ENABLED
+              ? buildOutputLinesFromTranscriptEntries(nextEntries)
+              : [...agent.outputLines, action.line],
+            transcriptEntries: nextEntries,
+            transcriptRevision: (agent.transcriptRevision ?? 0) + 1,
+            transcriptSequenceCounter: Math.max(
+              agent.transcriptSequenceCounter ?? 0,
+              nextEntry.sequenceKey + 1
+            ),
+          };
+        }),
       };
     case "markActivity": {
       const at = action.at ?? Date.now();

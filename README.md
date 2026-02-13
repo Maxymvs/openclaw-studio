@@ -113,6 +113,36 @@ Paths and key settings:
 - The modal is agent-scoped and walks through template selection, task text, schedule, and review.
 - Submitting creates the job via gateway `cron.add` and refreshes that same agent's cron list.
 
+## Agent creation workflow
+
+- Click **New Agent** in the fleet sidebar.
+- Pick a **Preset bundle** (for example Research Analyst, PR Engineer, Autonomous Engineer, Growth Operator, Coordinator, or Blank).
+- Each preset card shows capability chips and risk level (`Exec`, `Internet`, `File tools`, `Sandbox`, `Heartbeat`, plus caveats when relevant).
+- Optionally override the **Control level** (Conservative, Balanced, or Autopilot).
+- Add optional customization (agent name, first task, notes, and advanced control toggles).
+- Review the behavior summary, then create.
+- Studio compiles this setup into per-agent artifacts only:
+  - per-agent sandbox/tool overrides in `agents.list[]`
+  - per-agent exec approval policy in `exec-approvals.json`
+  - core agent files (`AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `TOOLS.md`, `HEARTBEAT.md`, `MEMORY.md`)
+  - additive tool policy (`tools.alsoAllow`) so preset selections do not remove base profile tools
+- If setup fails after `agents.create`, Studio keeps the created agent, stores a pending setup in tab-scoped session storage keyed by gateway URL, and shows `Retry setup` / `Discard pending setup` in chat.
+- Auto-retry is deduplicated across reconnect and restart flows, so one pending setup is applied at most once at a time per agent.
+- Studio does not modify global defaults during creation.
+
+## Exec approvals in chat
+
+- When a run requires exec approval, chat shows an **Exec approval required** card with:
+  - command preview
+  - host and cwd
+  - expiration timestamp
+- Resolve directly in chat with:
+  - **Allow once**
+  - **Always allow**
+  - **Deny**
+- The fleet row displays **Needs approval** while approvals are pending for that agent.
+- Expired approvals are pruned automatically, so stale cards and stale **Needs approval** badges clear without a manual resolve event.
+
 ## Troubleshooting
 
 - **Missing config**: Run `openclaw onboard` or set `OPENCLAW_CONFIG_PATH`

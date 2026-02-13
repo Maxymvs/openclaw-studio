@@ -55,6 +55,23 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 export type ConfigAgentEntry = Record<string, unknown> & { id: string };
 
+export type GatewayAgentSandboxOverrides = {
+  mode?: "off" | "non-main" | "all";
+  workspaceAccess?: "none" | "ro" | "rw";
+};
+
+export type GatewayAgentToolsOverrides = {
+  profile?: "minimal" | "coding" | "messaging" | "full";
+  allow?: string[];
+  alsoAllow?: string[];
+  deny?: string[];
+};
+
+export type GatewayAgentOverrides = {
+  sandbox?: GatewayAgentSandboxOverrides;
+  tools?: GatewayAgentToolsOverrides;
+};
+
 export const readConfigAgentList = (
   config: Record<string, unknown> | undefined
 ): ConfigAgentEntry[] => {
@@ -275,9 +292,9 @@ const shouldRetryConfigWrite = (err: unknown) => {
   return /re-run config\.get|config changed since last load/i.test(err.message);
 };
 
-const applyGatewayConfigSet = async (params: {
+const applyGatewayConfigPatch = async (params: {
   client: GatewayClient;
-  nextConfig: Record<string, unknown>;
+  patch: Record<string, unknown>;
   baseHash?: string | null;
   exists?: boolean;
   attempt?: number;
@@ -289,7 +306,40 @@ const applyGatewayConfigSet = async (params: {
     throw new Error("Gateway config hash unavailable; re-run config.get.");
   }
   const payload: Record<string, unknown> = {
-    raw: JSON.stringify(params.nextConfig, null, 2),
+    raw: JSON.stringify(params.patch, null, 2),
+  };
+  if (baseHash) payload.baseHash = baseHash;
+  try {
+    await params.client.call("config.patch", payload);
+  } catch (err) {
+    if (attempt < 1 && shouldRetryConfigWrite(err)) {
+      const snapshot = await params.client.call<GatewayConfigSnapshot>("config.get", {});
+      return applyGatewayConfigPatch({
+        ...params,
+        baseHash: snapshot.hash ?? undefined,
+        exists: snapshot.exists,
+        attempt: attempt + 1,
+      });
+    }
+    throw err;
+  }
+};
+
+const applyGatewayConfigSet = async (params: {
+  client: GatewayClient;
+  config: Record<string, unknown>;
+  baseHash?: string | null;
+  exists?: boolean;
+  attempt?: number;
+}): Promise<void> => {
+  const attempt = params.attempt ?? 0;
+  const requiresBaseHash = params.exists !== false;
+  const baseHash = requiresBaseHash ? params.baseHash?.trim() : undefined;
+  if (requiresBaseHash && !baseHash) {
+    throw new Error("Gateway config hash unavailable; re-run config.get.");
+  }
+  const payload: Record<string, unknown> = {
+    raw: JSON.stringify(params.config, null, 2),
   };
   if (baseHash) payload.baseHash = baseHash;
   try {
@@ -410,9 +460,9 @@ export const updateGatewayHeartbeat = async (params: {
     return next;
   });
   const nextConfig = writeConfigAgentList(baseConfig, nextList);
-  await applyGatewayConfigSet({
+  await applyGatewayConfigPatch({
     client: params.client,
-    nextConfig,
+    patch: { agents: { list: nextList } },
     baseHash: snapshot.hash ?? undefined,
     exists: snapshot.exists,
   });
@@ -438,11 +488,93 @@ export const removeGatewayHeartbeatOverride = async (params: {
     return resolveHeartbeatSettings(baseConfig, params.agentId);
   }
   const nextConfig = writeConfigAgentList(baseConfig, nextList);
-  await applyGatewayConfigSet({
+  await applyGatewayConfigPatch({
     client: params.client,
-    nextConfig,
+    patch: { agents: { list: nextList } },
     baseHash: snapshot.hash ?? undefined,
     exists: snapshot.exists,
   });
   return resolveHeartbeatSettings(nextConfig, params.agentId);
+};
+
+const normalizeToolList = (values: string[] | undefined): string[] | undefined => {
+  if (!values) return undefined;
+  const next = values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  return Array.from(new Set(next));
+};
+
+export const updateGatewayAgentOverrides = async (params: {
+  client: GatewayClient;
+  agentId: string;
+  overrides: GatewayAgentOverrides;
+}): Promise<void> => {
+  const agentId = params.agentId.trim();
+  if (!agentId) {
+    throw new Error("Agent id is required.");
+  }
+  if (params.overrides.tools?.allow !== undefined && params.overrides.tools?.alsoAllow !== undefined) {
+    throw new Error("Agent tools overrides cannot set both allow and alsoAllow.");
+  }
+  const hasSandboxOverrides =
+    Boolean(params.overrides.sandbox?.mode) || Boolean(params.overrides.sandbox?.workspaceAccess);
+  const hasToolsOverrides =
+    Boolean(params.overrides.tools?.profile) ||
+    params.overrides.tools?.allow !== undefined ||
+    params.overrides.tools?.alsoAllow !== undefined ||
+    params.overrides.tools?.deny !== undefined;
+  if (!hasSandboxOverrides && !hasToolsOverrides) {
+    return;
+  }
+
+  const snapshot = await params.client.call<GatewayConfigSnapshot>("config.get", {});
+  const baseConfig = isRecord(snapshot.config) ? snapshot.config : {};
+  const list = readConfigAgentList(baseConfig);
+  const { list: nextList } = upsertConfigAgentEntry(list, agentId, (entry) => {
+    const next: ConfigAgentEntry = { ...entry, id: agentId };
+
+    if (hasSandboxOverrides) {
+      const currentSandbox = isRecord(next.sandbox) ? { ...next.sandbox } : {};
+      if (params.overrides.sandbox?.mode) {
+        currentSandbox.mode = params.overrides.sandbox.mode;
+      }
+      if (params.overrides.sandbox?.workspaceAccess) {
+        currentSandbox.workspaceAccess = params.overrides.sandbox.workspaceAccess;
+      }
+      next.sandbox = currentSandbox;
+    }
+
+    if (hasToolsOverrides) {
+      const currentTools = isRecord(next.tools) ? { ...next.tools } : {};
+      if (params.overrides.tools?.profile) {
+        currentTools.profile = params.overrides.tools.profile;
+      }
+      const allow = normalizeToolList(params.overrides.tools?.allow);
+      if (allow !== undefined) {
+        currentTools.allow = allow;
+        delete currentTools.alsoAllow;
+      }
+      const alsoAllow = normalizeToolList(params.overrides.tools?.alsoAllow);
+      if (alsoAllow !== undefined) {
+        currentTools.alsoAllow = alsoAllow;
+        delete currentTools.allow;
+      }
+      const deny = normalizeToolList(params.overrides.tools?.deny);
+      if (deny !== undefined) {
+        currentTools.deny = deny;
+      }
+      next.tools = currentTools;
+    }
+
+    return next;
+  });
+
+  const nextConfig = writeConfigAgentList(baseConfig, nextList);
+  await applyGatewayConfigSet({
+    client: params.client,
+    config: nextConfig,
+    baseHash: snapshot.hash ?? undefined,
+    exists: snapshot.exists,
+  });
 };

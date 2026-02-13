@@ -75,16 +75,19 @@ describe("sendChatMessageViaStudio", () => {
     });
 
     expect(clearRunTracking).toHaveBeenCalledWith("run-1");
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "updateAgent",
-      agentId: agent.agentId,
-      patch: {
-        outputLines: [],
-        streamText: null,
-        thinkingTrace: null,
-        lastResult: null,
-      },
-    });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "updateAgent",
+        agentId: agent.agentId,
+        patch: expect.objectContaining({
+          outputLines: [],
+          streamText: null,
+          thinkingTrace: null,
+          lastResult: null,
+          transcriptEntries: [],
+        }),
+      })
+    );
   });
 
   it("syncs_session_settings_when_not_synced", async () => {
@@ -115,11 +118,62 @@ describe("sendChatMessageViaStudio", () => {
 
     const methods = call.mock.calls.map((entry) => entry[0]);
     expect(methods).toEqual(["sessions.patch", "chat.send"]);
+    expect(call).toHaveBeenCalledWith(
+      "sessions.patch",
+      expect.objectContaining({
+        key: agent.sessionKey,
+        model: "openai/gpt-5",
+        thinkingLevel: "medium",
+      })
+    );
     expect(dispatch).toHaveBeenCalledWith({
       type: "updateAgent",
       agentId: agent.agentId,
       patch: { sessionSettingsSynced: true, sessionCreated: true },
     });
+  });
+
+  it("syncs exec session overrides for ask-first agents", async () => {
+    const agent = createAgent({
+      sessionSettingsSynced: false,
+      sessionCreated: false,
+      sessionExecHost: "gateway",
+      sessionExecSecurity: "allowlist",
+      sessionExecAsk: "always",
+    });
+    const dispatch = vi.fn();
+    const call = vi.fn(async (method: string) => {
+      if (method === "sessions.patch") {
+        return {
+          ok: true,
+          key: agent.sessionKey,
+          entry: { thinkingLevel: "medium" },
+          resolved: { modelProvider: "openai", model: "gpt-5" },
+        };
+      }
+      return { ok: true };
+    });
+
+    await sendChatMessageViaStudio({
+      client: { call },
+      dispatch,
+      getAgent: () => agent,
+      agentId: agent.agentId,
+      sessionKey: agent.sessionKey,
+      message: "hello",
+      now: () => 1234,
+      generateRunId: () => "run-1",
+    });
+
+    expect(call).toHaveBeenCalledWith(
+      "sessions.patch",
+      expect.objectContaining({
+        key: agent.sessionKey,
+        execHost: "gateway",
+        execSecurity: "allowlist",
+        execAsk: "always",
+      })
+    );
   });
 
   it("does_not_sync_session_settings_when_already_synced", async () => {
@@ -146,6 +200,38 @@ describe("sendChatMessageViaStudio", () => {
       "sessions.patch",
       expect.anything()
     );
+  });
+
+  it("supports_internal_send_without_local_user_echo", async () => {
+    const agent = createAgent({ sessionSettingsSynced: true });
+    const dispatch = vi.fn();
+    const call = vi.fn(async () => ({ ok: true }));
+
+    await sendChatMessageViaStudio({
+      client: { call },
+      dispatch,
+      getAgent: () => agent,
+      agentId: agent.agentId,
+      sessionKey: agent.sessionKey,
+      message: "internal follow-up",
+      echoUserMessage: false,
+      now: () => 1234,
+      generateRunId: () => "run-1",
+    });
+
+    const dispatchedActions = dispatch.mock.calls.map((entry) => entry[0]);
+    expect(
+      dispatchedActions.some(
+        (action) => action.type === "appendOutput" && action.line === "> internal follow-up"
+      )
+    ).toBe(false);
+    const runningUpdate = dispatchedActions.find(
+      (action) => action.type === "updateAgent" && action.patch?.status === "running"
+    );
+    expect(runningUpdate).toBeTruthy();
+    if (runningUpdate && runningUpdate.type === "updateAgent") {
+      expect(runningUpdate.patch.lastUserMessage).toBeUndefined();
+    }
   });
 
   it("marks_error_on_gateway_failure", async () => {

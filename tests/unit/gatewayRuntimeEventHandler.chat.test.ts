@@ -469,4 +469,52 @@ describe("gateway runtime event handler (chat)", () => {
       })
     );
   });
+
+  it("ignores late delta chat events after a run has already finalized", () => {
+    const agents = [createAgent({ status: "running", runId: "run-1", runStartedAt: 900 })];
+    const queueLivePatch = vi.fn();
+    const handler = createGatewayRuntimeEventHandler({
+      getStatus: () => "connected",
+      getAgents: () => agents,
+      dispatch: vi.fn(),
+      queueLivePatch,
+      clearPendingLivePatch: vi.fn(),
+      now: () => 1000,
+      loadSummarySnapshot: vi.fn(async () => {}),
+      loadAgentHistory: vi.fn(async () => {}),
+      refreshHeartbeatLatestUpdate: vi.fn(),
+      bumpHeartbeatTick: vi.fn(),
+      setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+      clearTimeout: (id) => clearTimeout(id as unknown as NodeJS.Timeout),
+      isDisconnectLikeError: () => false,
+      logWarn: vi.fn(),
+      updateSpecialLatestUpdate: vi.fn(),
+    });
+
+    handler.handleEvent({
+      type: "event",
+      event: "chat",
+      payload: {
+        runId: "run-1",
+        sessionKey: agents[0]!.sessionKey,
+        state: "final",
+        message: { role: "assistant", content: "done" },
+      },
+    });
+
+    queueLivePatch.mockClear();
+
+    handler.handleEvent({
+      type: "event",
+      event: "chat",
+      payload: {
+        runId: "run-1",
+        sessionKey: agents[0]!.sessionKey,
+        state: "delta",
+        message: { role: "assistant", content: "late text" },
+      },
+    });
+
+    expect(queueLivePatch).not.toHaveBeenCalled();
+  });
 });
