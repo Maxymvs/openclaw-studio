@@ -98,7 +98,7 @@ function TaskCard({
                     e.stopPropagation();
                     onRun(task.id);
                   }}
-                  className="text-zinc-600 hover:text-green-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="text-zinc-600 hover:text-green-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity rounded focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:outline-none"
                   aria-label={`Run ${task.title}`}
                   title="Send to agent"
                 >
@@ -107,7 +107,7 @@ function TaskCard({
               )}
               <button
                 onClick={() => onDelete(task.id)}
-                className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity rounded focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
                 aria-label={`Delete ${task.title}`}
               >
                 <Trash2 size={12} />
@@ -263,22 +263,25 @@ function TaskCreateForm({
   return (
     <form onSubmit={handleSubmit} className="flex items-end gap-2 flex-wrap">
       <input
-        autoFocus
+        autoFocus /* justified: form just opened, user expects to type immediately */
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Task title"
-        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 w-48"
+        placeholder="Task title\u2026"
+        aria-label="Task title"
+        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500 w-48"
       />
       <input
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description (optional)"
-        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 w-52"
+        placeholder="Description (optional)\u2026"
+        aria-label="Task description"
+        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500 w-52"
       />
       <select
         value={agent}
         onChange={(e) => setAgent(e.target.value)}
-        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500"
+        aria-label="Assign agent"
+        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
       >
         <option value="unassigned">unassigned</option>
         {agents.map((a) => (
@@ -290,7 +293,8 @@ function TaskCreateForm({
       <select
         value={priority}
         onChange={(e) => setPriority(e.target.value as Priority)}
-        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500"
+        aria-label="Task priority"
+        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
       >
         {PRIORITIES.map((p) => (
           <option key={p} value={p}>

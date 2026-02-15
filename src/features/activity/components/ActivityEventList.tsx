@@ -85,6 +85,8 @@ export function ActivityEventList({ events }: ActivityEventListProps) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       data-testid="activity-event-list"
+      aria-live="polite"
+      aria-relevant="additions"
     >
       {events.map((event) => (
         <ActivityEventRow key={event.id} event={event} />

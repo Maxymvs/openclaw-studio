@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { LazyMarkdown } from "@/components/LazyMarkdown";
 import { FileText, X } from "lucide-react";
 
 import { fetchJson } from "@/lib/http";
@@ -85,7 +84,7 @@ const getDescriptionPreview = (value: string) => {
       .find((line) => line.length > 0) ?? "";
   if (!firstLine) return "";
   if (firstLine.length <= 140) return firstLine;
-  return `${firstLine.slice(0, 140)}...`;
+  return `${firstLine.slice(0, 140)}\u2026`;
 };
 
 function Column({
@@ -421,7 +420,7 @@ export function TaskBoard({ snapshot, onRequestRefresh }: TaskBoardProps) {
 
       {detailsCard ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm overscroll-contain"
           role="dialog"
           aria-modal="true"
           aria-label={`Details for ${detailsCard.id}`}
@@ -650,7 +649,7 @@ export function TaskBoard({ snapshot, onRequestRefresh }: TaskBoardProps) {
                   <div className="mt-2 rounded-md border border-border/70 bg-background/40 px-3 py-3">
                     {descriptionBody ? (
                       <div className="agent-markdown text-sm text-foreground">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{descriptionBody}</ReactMarkdown>
+                        <LazyMarkdown>{descriptionBody}</LazyMarkdown>
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">No description.</p>

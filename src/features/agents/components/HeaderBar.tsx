@@ -38,7 +38,7 @@ export const HeaderBar = ({
           ) : null}
           <ThemeToggle />
           <button
-            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
               brainFilesOpen
                 ? "border-border bg-muted text-foreground"
                 : "border-input/90 bg-background/75 text-foreground hover:border-ring hover:bg-card"
@@ -53,7 +53,7 @@ export const HeaderBar = ({
           </button>
           <details className="group relative">
             <summary
-              className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-input/80 bg-background/70 text-muted-foreground transition hover:border-ring hover:bg-card hover:text-foreground [&::-webkit-details-marker]:hidden"
+              className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-input/80 bg-background/70 text-muted-foreground transition hover:border-ring hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
               data-testid="studio-menu-toggle"
             >
               <Ellipsis className="h-4 w-4" />

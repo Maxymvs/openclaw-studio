@@ -235,6 +235,11 @@ const AgentStudioPage = () => {
   const reconcileRunInFlightRef = useRef<Set<string>>(new Set());
 
   const agents = state.agents;
+  const agentsById = useMemo(() => {
+    const map = new Map<string, AgentState>();
+    for (const agent of agents) map.set(agent.agentId, agent);
+    return map;
+  }, [agents]);
   const selectedAgent = useMemo(() => getSelectedAgent(state), [state]);
   const filteredAgents = useMemo(
     () => getFilteredAgents(state, focusFilter),
@@ -251,8 +256,8 @@ const AgentStudioPage = () => {
   const focusedAgentRunning = focusedAgent?.status === "running";
   const settingsAgent = useMemo(() => {
     if (!settingsAgentId) return null;
-    return agents.find((entry) => entry.agentId === settingsAgentId) ?? null;
-  }, [agents, settingsAgentId]);
+    return agentsById.get(settingsAgentId) ?? null;
+  }, [agentsById, settingsAgentId]);
   const selectedBrainAgentId = useMemo(() => {
     return focusedAgent?.agentId ?? agents[0]?.agentId ?? null;
   }, [agents, focusedAgent]);
@@ -1006,7 +1011,7 @@ const AgentStudioPage = () => {
         setError("The main agent cannot be deleted.");
         return;
       }
-      const agent = agents.find((entry) => entry.agentId === agentId);
+      const agent = agentsById.get(agentId);
       if (!agent) return;
       const confirmed = window.confirm(
         `Delete ${agent.name}? This removes the agent from gateway config + cron and moves its workspace/state into ~/.openclaw/trash on the gateway host.`
@@ -1055,7 +1060,7 @@ const AgentStudioPage = () => {
       }
     },
     [
-      agents,
+      agentsById,
       client,
       createAgentBlock,
       deleteAgentBlock,
@@ -1303,7 +1308,7 @@ const AgentStudioPage = () => {
 
   const handleNewSession = useCallback(
     async (agentId: string) => {
-      const agent = agents.find((entry) => entry.agentId === agentId);
+      const agent = agentsById.get(agentId);
       if (!agent) {
         setError("Failed to start new session: agent not found.");
         return;
@@ -1336,7 +1341,7 @@ const AgentStudioPage = () => {
         });
       }
     },
-    [agents, client, dispatch, setError]
+    [agentsById, client, dispatch, setError]
   );
 
   useEffect(() => {
@@ -1519,7 +1524,7 @@ const AgentStudioPage = () => {
       if (deleteAgentBlock) return false;
       if (createAgentBlock) return false;
       if (renameAgentBlock) return false;
-      const agent = agents.find((entry) => entry.agentId === agentId);
+      const agent = agentsById.get(agentId);
       if (!agent) return false;
       try {
         setRenameAgentBlock({
@@ -1567,7 +1572,7 @@ const AgentStudioPage = () => {
       }
     },
     [
-      agents,
+      agentsById,
       client,
       createAgentBlock,
       deleteAgentBlock,
@@ -1746,7 +1751,7 @@ const AgentStudioPage = () => {
             <div className="grid grid-cols-4 gap-2">
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
                   mobilePane === "fleet"
                     ? "border-border bg-muted text-foreground shadow-xs"
                     : "border-border/80 bg-card/65 text-muted-foreground hover:border-border hover:bg-muted/70"
@@ -1757,7 +1762,7 @@ const AgentStudioPage = () => {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
                   mobilePane === "chat"
                     ? "border-border bg-muted text-foreground shadow-xs"
                     : "border-border/80 bg-card/65 text-muted-foreground hover:border-border hover:bg-muted/70"
@@ -1768,7 +1773,7 @@ const AgentStudioPage = () => {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
                   mobilePane === "settings"
                     ? "border-border bg-muted text-foreground shadow-xs"
                     : "border-border/80 bg-card/65 text-muted-foreground hover:border-border hover:bg-muted/70"
@@ -1780,7 +1785,7 @@ const AgentStudioPage = () => {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
                   mobilePane === "brain"
                     ? "border-border bg-muted text-foreground shadow-xs"
                     : "border-border/80 bg-card/65 text-muted-foreground hover:border-border hover:bg-muted/70"
@@ -1918,7 +1923,7 @@ const AgentStudioPage = () => {
       </div>
       {createAgentBlock && createAgentBlock.phase !== "queued" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm overscroll-contain"
           data-testid="agent-create-restart-modal"
           role="dialog"
           aria-modal="true"
@@ -1944,7 +1949,7 @@ const AgentStudioPage = () => {
       ) : null}
       {renameAgentBlock && renameAgentBlock.phase !== "queued" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm overscroll-contain"
           data-testid="agent-rename-restart-modal"
           role="dialog"
           aria-modal="true"
@@ -1970,7 +1975,7 @@ const AgentStudioPage = () => {
       ) : null}
       {deleteAgentBlock && deleteAgentBlock.phase !== "queued" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm overscroll-contain"
           data-testid="agent-delete-restart-modal"
           role="dialog"
           aria-modal="true"

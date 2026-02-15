@@ -1,4 +1,11 @@
 import "@testing-library/jest-dom/vitest";
+import { vi } from "vitest";
+// Mock LazyMarkdown to render synchronously in tests.
+// In production, LazyMarkdown uses next/dynamic to code-split react-markdown + remark-gfm.
+vi.mock("@/components/LazyMarkdown", async () => {
+  const { LazyMarkdownInner } = await import("@/components/LazyMarkdownInner");
+  return { LazyMarkdown: LazyMarkdownInner };
+});
 
 const ensureLocalStorage = () => {
   if (typeof window === "undefined") return;

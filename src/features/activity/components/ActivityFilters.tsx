@@ -34,7 +34,7 @@ export function ActivityFiltersBar({
     >
       {/* Agent filter */}
       <select
-        className="bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1 outline-none focus:border-zinc-500"
+        className="bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs rounded px-2 py-1 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
         value={filters.agentId ?? ""}
         onChange={(e) => onAgentFilter(e.target.value || null)}
         aria-label="Filter by agent"
@@ -55,7 +55,7 @@ export function ActivityFiltersBar({
             <button
               key={type}
               onClick={() => onToggleEventType(type)}
-              className={`text-xs px-2 py-0.5 rounded transition-colors ${
+              className={`text-xs px-2 py-0.5 rounded transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none ${
                 active
                   ? "bg-zinc-700 text-zinc-200"
                   : "bg-zinc-900 text-zinc-500 hover:text-zinc-300"

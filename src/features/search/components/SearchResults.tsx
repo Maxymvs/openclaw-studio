@@ -12,11 +12,11 @@ function SearchResultRow({ result, onNavigate }: SearchResultRowProps) {
   return (
     <button
       onClick={() => onNavigate(result.agentId, result.fileName)}
-      className="w-full text-left px-4 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors group"
+      className="w-full text-left px-4 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors group focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none"
       data-testid="search-result-row"
     >
       <div className="flex items-center gap-2 mb-1">
-        <FileText size={14} className="text-zinc-500 shrink-0" />
+        <FileText size={14} className="text-zinc-500 shrink-0" aria-hidden="true" />
         <span className="text-sm text-zinc-300 font-medium">
           {result.agentId}
         </span>

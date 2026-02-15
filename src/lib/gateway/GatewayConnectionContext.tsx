@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { useGatewayConnection, type GatewayConnectionState } from "./GatewayClient";
 import {
   createStudioSettingsCoordinator,
@@ -31,10 +31,10 @@ export const GatewayConnectionProvider = ({ children }: GatewayConnectionProvide
   const [settingsCoordinator] = useState(() => createStudioSettingsCoordinator());
   const connection = useGatewayConnection(settingsCoordinator);
 
-  const value: GatewayConnectionContextValue = {
-    ...connection,
-    settingsCoordinator,
-  };
+  const value = useMemo<GatewayConnectionContextValue>(
+    () => ({ ...connection, settingsCoordinator }),
+    [connection, settingsCoordinator]
+  );
 
   return (
     <GatewayConnectionContext.Provider value={value}>

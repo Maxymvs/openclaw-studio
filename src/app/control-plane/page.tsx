@@ -56,7 +56,7 @@ export default function ControlPlanePage() {
       <section data-testid="task-control-plane-page" className="min-h-0 flex-1">
         {loading ? (
           <div className="glass-panel flex h-full items-center justify-center rounded-xl p-4 text-muted-foreground">
-            Loading task board...
+            Loading task board\u2026
           </div>
         ) : null}
         {!loading && error ? (

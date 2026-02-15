@@ -18,7 +18,7 @@ function FilterPill({ label, active, onClick }: FilterPillProps) {
   return (
     <button
       onClick={onClick}
-      className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
+      className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none ${
         active
           ? "bg-zinc-700 border-zinc-600 text-zinc-200"
           : "bg-transparent border-zinc-700 text-zinc-500 hover:text-zinc-400 hover:border-zinc-600"
@@ -93,20 +93,20 @@ export default function CalendarPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={goToPrevWeek}
-              className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors"
+              className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none rounded"
               aria-label="Previous week"
             >
               <ChevronLeft size={18} />
             </button>
             <button
               onClick={goToThisWeek}
-              className="text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-800 transition-colors"
+              className="text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-800 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none"
             >
               Today
             </button>
             <button
               onClick={goToNextWeek}
-              className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors"
+              className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none rounded"
               aria-label="Next week"
             >
               <ChevronRight size={18} />

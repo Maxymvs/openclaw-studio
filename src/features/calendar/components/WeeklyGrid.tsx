@@ -26,7 +26,7 @@ function SlotCard({ slot, onRun, onDelete }: SlotCardProps) {
       <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onRun(slot.job.id)}
-          className="text-green-400 hover:text-green-300 p-0.5"
+          className="text-green-400 hover:text-green-300 p-0.5 rounded focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:outline-none"
           title="Run now"
           aria-label={`Run ${slot.label}`}
           data-testid="calendar-run-job"
@@ -35,7 +35,7 @@ function SlotCard({ slot, onRun, onDelete }: SlotCardProps) {
         </button>
         <button
           onClick={() => onDelete(slot.job.id)}
-          className="text-red-400 hover:text-red-300 p-0.5"
+          className="text-red-400 hover:text-red-300 p-0.5 rounded focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
           title="Delete"
           aria-label={`Delete ${slot.label}`}
           data-testid="calendar-delete-job"

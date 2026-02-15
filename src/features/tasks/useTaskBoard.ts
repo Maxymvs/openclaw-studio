@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import type { Task, ColumnId, Priority } from "./types";
 
 const STORAGE_KEY = "openclaw-tasks";
@@ -20,12 +20,8 @@ function saveTasks(tasks: Task[]) {
 }
 
 export function useTaskBoard() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(loadTasks);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setTasks(loadTasks());
-  }, []);
 
   const persist = useCallback((next: Task[]) => {
     setTasks(next);

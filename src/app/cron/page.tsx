@@ -149,31 +149,34 @@ function JobCard({
           <button
             onClick={handleRun}
             disabled={running}
-            className="p-1.5 rounded text-zinc-600 hover:text-green-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            className="p-1.5 rounded text-zinc-600 hover:text-green-400 hover:bg-zinc-800 transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none"
             title="Run now"
+            aria-label={`Run ${job.name || job.jobId} now`}
           >
             {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
           </button>
           <button
             onClick={() => onToggle(job.jobId, !job.enabled)}
-            className={`p-1.5 rounded transition-colors ${
+            className={`p-1.5 rounded transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none ${
               job.enabled
                 ? "text-green-500 hover:text-yellow-400 hover:bg-zinc-800"
                 : "text-zinc-600 hover:text-green-400 hover:bg-zinc-800"
             }`}
             title={job.enabled ? "Disable" : "Enable"}
+            aria-label={`${job.enabled ? "Disable" : "Enable"} ${job.name || job.jobId}`}
           >
             {job.enabled ? <Power size={14} /> : <PowerOff size={14} />}
           </button>
           <button
             onClick={handleDelete}
             onBlur={() => setConfirming(false)}
-            className={`p-1.5 rounded transition-colors ${
+            className={`p-1.5 rounded transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:outline-none ${
               confirming
                 ? "text-red-400 bg-red-900/30"
                 : "text-zinc-600 hover:text-red-400 hover:bg-zinc-800"
             }`}
             title={confirming ? "Click again to confirm" : "Delete"}
+            aria-label={`Delete ${job.name || job.jobId}`}
           >
             <Trash2 size={14} />
           </button>
@@ -269,11 +272,11 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
 
       {/* Name */}
       <input
-        autoFocus
+        autoFocus /* justified: form just opened, user expects to type immediately */
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Job name (optional)"
-        className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+        placeholder="Job name (optional)\u2026"
+        className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
       />
 
       {/* Schedule */}
@@ -283,7 +286,7 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
           <select
             value={scheduleKind}
             onChange={(e) => setScheduleKind(e.target.value as ScheduleKind)}
-            className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500"
+            className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
           >
             <option value="cron">Cron expression</option>
             <option value="every">Every interval</option>
@@ -298,7 +301,7 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
                 value={cronExpr}
                 onChange={(e) => setCronExpr(e.target.value)}
                 placeholder="0 9 * * *"
-                className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
               />
             </div>
             <div>
@@ -306,8 +309,8 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
               <input
                 value={tz}
                 onChange={(e) => setTz(e.target.value)}
-                placeholder="America/Los_Angeles"
-                className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 w-44"
+                placeholder="America/Los_Angeles\u2026"
+                className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500 w-44"
               />
             </div>
           </>
@@ -319,7 +322,7 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
               min={1}
               value={everyMinutes}
               onChange={(e) => setEveryMinutes(Number(e.target.value))}
-              className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 w-24"
+              className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500 w-24"
             />
           </div>
         )}
@@ -332,7 +335,7 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
           <select
             value={sessionTarget}
             onChange={(e) => setSessionTarget(e.target.value as SessionTarget)}
-            className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-500"
+            className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500"
           >
             <option value="isolated">isolated (agentTurn)</option>
             <option value="main">main (systemEvent)</option>
@@ -353,11 +356,11 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
           onChange={(e) => setPayloadText(e.target.value)}
           placeholder={
             payloadKind === "systemEvent"
-              ? "System event text..."
-              : "Message for the agent..."
+              ? "System event text\u2026"
+              : "Message for the agent\u2026"
           }
           rows={2}
-          className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 resize-none"
+          className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:border-zinc-500 resize-none"
         />
       </div>
 

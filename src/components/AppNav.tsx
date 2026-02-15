@@ -24,7 +24,7 @@ export function AppNav() {
 
   return (
     <nav
-      className="flex flex-col gap-1 p-2 border-r border-zinc-800 bg-zinc-950 w-14 hover:w-44 transition-all duration-200 group overflow-hidden shrink-0"
+      className="flex flex-col gap-1 p-2 border-r border-zinc-800 bg-zinc-950 w-14 hover:w-44 transition-[width] duration-200 group overflow-hidden shrink-0"
       aria-label="Main navigation"
     >
       {navItems.map((item) => {
@@ -37,7 +37,7 @@ export function AppNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none ${
               isActive
                 ? "bg-zinc-800 text-white"
                 : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"

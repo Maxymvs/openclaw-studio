@@ -73,36 +73,37 @@ export async function GET(request: NextRequest) {
     const results: SearchResultItem[] = [];
     const lowerQuery = query.toLowerCase();
 
-    // Search each agent's files
-    for (const agent of agents) {
-      for (const fileName of AGENT_FILES) {
-        try {
-          const fileRes = await fetch(
-            `${httpUrl}/api/agents/${encodeURIComponent(agent.id)}/files/${encodeURIComponent(fileName)}`,
-            { headers }
-          );
-          if (!fileRes.ok) continue;
+    // Fetch all agent files in parallel to avoid sequential waterfall
+    const fetches = agents.flatMap((agent) =>
+      AGENT_FILES.map(async (fileName) => {
+        const fileRes = await fetch(
+          `${httpUrl}/api/agents/${encodeURIComponent(agent.id)}/files/${encodeURIComponent(fileName)}`,
+          { headers }
+        );
+        if (!fileRes.ok) return null;
+        const fileData = (await fileRes.json()) as { content?: string };
+        return { agentId: agent.id, fileName, content: fileData.content ?? "" };
+      })
+    );
+    const settled = await Promise.allSettled(fetches);
 
-          const fileData = (await fileRes.json()) as { content?: string };
-          const content = fileData.content ?? "";
-          if (!content) continue;
+    for (const entry of settled) {
+      if (entry.status !== "fulfilled" || !entry.value) continue;
+      const { agentId, fileName, content } = entry.value;
+      if (!content) continue;
 
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(lowerQuery)) {
-              const snippetStart = Math.max(0, i - 1);
-              const snippetEnd = Math.min(lines.length, i + 2);
-              results.push({
-                agentId: agent.id,
-                fileName,
-                matchLine: lines[i],
-                lineNumber: i + 1,
-                snippet: lines.slice(snippetStart, snippetEnd).join("\n"),
-              });
-            }
-          }
-        } catch {
-          // Skip files that can't be fetched
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].toLowerCase().includes(lowerQuery)) {
+          const snippetStart = Math.max(0, i - 1);
+          const snippetEnd = Math.min(lines.length, i + 2);
+          results.push({
+            agentId,
+            fileName,
+            matchLine: lines[i],
+            lineNumber: i + 1,
+            snippet: lines.slice(snippetStart, snippetEnd).join("\n"),
+          });
         }
       }
     }

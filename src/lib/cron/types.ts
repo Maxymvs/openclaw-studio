@@ -70,7 +70,10 @@ export const resolveLatestCronJobForAgent = (
 ): CronJobSummary | null => {
   const filtered = filterCronJobsForAgent(jobs, agentId);
   if (filtered.length === 0) return null;
-  return [...filtered].sort((a, b) => b.updatedAtMs - a.updatedAtMs)[0] ?? null;
+  return filtered.reduce<CronJobSummary | null>(
+    (max, job) => (!max || job.updatedAtMs > max.updatedAtMs ? job : max),
+    null
+  );
 };
 
 const formatEveryMs = (everyMs: number) => {

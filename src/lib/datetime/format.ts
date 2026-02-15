@@ -32,7 +32,7 @@ export const formatRelativeTime = (timestampMs: number, nowMs?: number): string 
  */
 export const formatTime = (timestampMs: number, locale?: string): string => {
   const date = new Date(timestampMs);
-  return date.toLocaleTimeString(locale ?? "en-US", {
+  return date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -44,7 +44,7 @@ export const formatTime = (timestampMs: number, locale?: string): string => {
  */
 export const formatShortDate = (timestampMs: number, locale?: string): string => {
   const date = new Date(timestampMs);
-  return date.toLocaleDateString(locale ?? "en-US", {
+  return date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
   });
@@ -84,8 +84,8 @@ export const getWeekDays = (weekStart: Date): Date[] => {
  * Format a day header for the calendar grid (e.g. "Mon 11").
  */
 export const formatDayHeader = (date: Date): string => {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return `${days[date.getDay()]} ${date.getDate()}`;
+  const weekday = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
+  return `${weekday} ${date.getDate()}`;
 };
 
 /**
