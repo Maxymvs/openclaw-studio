@@ -72,32 +72,43 @@ export async function hydrateAgentFleetFromGateway(params: {
 }): Promise<HydrateAgentFleetResult> {
   const logError = params.logError ?? ((message, error) => console.error(message, error));
 
+  let configSnapshot = params.cachedConfigSnapshot;
+  if (!configSnapshot) {
+    try {
+      configSnapshot = (await params.client.call(
+        "config.get",
+        {}
+      )) as GatewayModelPolicySnapshot;
+    } catch (err) {
+      if (!params.isDisconnectLikeError(err)) {
+        logError("Failed to load gateway config while loading agents.", err);
+      }
+    }
+  }
+
   const gatewayKey = params.gatewayUrl.trim();
+  let settings: StudioSettings | null = null;
+  if (gatewayKey) {
+    try {
+      settings = await params.loadStudioSettings();
+    } catch (err) {
+      logError("Failed to load studio settings while loading agents.", err);
+    }
+  }
 
-  // Parallelize three independent calls: config.get, loadStudioSettings, agents.list
-  const [configResult, settingsResult, agentsResult] = await Promise.all([
-    params.cachedConfigSnapshot
-      ? Promise.resolve(params.cachedConfigSnapshot)
-      : params.client
-          .call("config.get", {})
-          .then((result) => result as GatewayModelPolicySnapshot)
-          .catch((err: unknown) => {
-            if (!params.isDisconnectLikeError(err)) {
-              logError("Failed to load gateway config while loading agents.", err);
-            }
-            return null;
-          }),
-    gatewayKey
-      ? params.loadStudioSettings().catch((err: unknown) => {
-          logError("Failed to load studio settings while loading agents.", err);
-          return null;
-        })
-      : Promise.resolve(null),
-    params.client.call("agents.list", {}) as Promise<AgentsListResult>,
-  ]);
+  let execApprovalsSnapshot: ExecApprovalsSnapshot | null = null;
+  try {
+    execApprovalsSnapshot = (await params.client.call(
+      "exec.approvals.get",
+      {}
+    )) as ExecApprovalsSnapshot;
+  } catch (err) {
+    if (!params.isDisconnectLikeError(err)) {
+      logError("Failed to load exec approvals while loading agents.", err);
+    }
+  }
 
-  const configSnapshot: GatewayModelPolicySnapshot | null = configResult;
-  const settings: StudioSettings | null = settingsResult;
+  const agentsResult = (await params.client.call("agents.list", {})) as AgentsListResult;
   const mainKey = agentsResult.mainKey?.trim() || "main";
 
   const mainSessionKeyByAgent = new Map<string, SessionsListEntry | null>();

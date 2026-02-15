@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { GatewayStatus } from "@/lib/gateway/GatewayClient";
-import { Brain, Plug } from "lucide-react";
+import { Brain, Ellipsis, Plug } from "lucide-react";
 
 type HeaderBarProps = {
   status: GatewayStatus;
@@ -74,15 +74,7 @@ export const HeaderBar = ({
             <Brain className="h-4 w-4" />
             Brain
           </button>
-          <details className="group relative">
-            <summary
-              className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-input/80 bg-background/70 text-muted-foreground transition hover:border-ring hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
-              data-testid="studio-menu-toggle"
-            >
-              <Ellipsis className="h-4 w-4" />
-              <span className="sr-only">Open studio menu</span>
-            </summary>
-            <div className="absolute right-0 top-11 z-20 min-w-44 rounded-md border border-border/80 bg-popover/95 p-1 shadow-lg backdrop-blur">
+          <div className="relative">
               <button
                 type="button"
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-input/80 bg-surface-3 text-muted-foreground transition hover:border-border hover:bg-surface-2 hover:text-foreground"
@@ -91,7 +83,7 @@ export const HeaderBar = ({
                 aria-expanded={menuOpen}
                 onClick={() => setMenuOpen((prev) => !prev)}
               >
-                <Plug className="h-4 w-4" />
+                <Ellipsis className="h-4 w-4" />
                 <span className="sr-only">Open studio menu</span>
               </button>
               {menuOpen ? (
@@ -109,8 +101,7 @@ export const HeaderBar = ({
                   </button>
                 </div>
               ) : null}
-            </div>
-          ) : null}
+          </div>
         </div>
       </div>
     </div>

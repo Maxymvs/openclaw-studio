@@ -78,25 +78,23 @@ export const ConnectionPanel = ({
         <label className="flex flex-col gap-1 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           Upstream Gateway URL
           <input
-            className="h-10 rounded-md border border-input bg-background/75 px-4 font-sans text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-            type="url"
+            className="h-10 rounded-md border border-input bg-surface-3 px-4 font-sans text-sm text-foreground outline-none transition"
+            type="text"
             value={gatewayUrl}
             onChange={(event) => onGatewayUrlChange(event.target.value)}
-            placeholder="ws://127.0.0.1:18789…"
+            placeholder="ws://localhost:18789"
             spellCheck={false}
-            autoComplete="url"
           />
         </label>
         <label className="flex flex-col gap-1 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           Upstream Token
           <input
-            className="h-10 rounded-md border border-input bg-background/75 px-4 font-sans text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="h-10 rounded-md border border-input bg-surface-3 px-4 font-sans text-sm text-foreground outline-none transition"
             type="password"
             value={token}
             onChange={(event) => onTokenChange(event.target.value)}
-            placeholder="gateway token…"
+            placeholder="gateway token"
             spellCheck={false}
-            autoComplete="off"
           />
         </label>
       </div>

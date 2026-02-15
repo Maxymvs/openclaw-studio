@@ -17,7 +17,11 @@ import {
   isHeartbeatPrompt,
   stripUiMetadata,
 } from "@/lib/text/message-extract";
-// useGatewayConnection is now provided via GatewayConnectionContext
+import {
+  parseAgentIdFromSessionKey,
+  syncGatewaySessionSettings,
+  useGatewayConnection,
+} from "@/lib/gateway/GatewayClient";
 import { createRafBatcher } from "@/lib/dom";
 import {
   buildGatewayModelChoices,
@@ -63,7 +67,7 @@ import {
 } from "@/lib/gateway/agentConfig";
 import { readGatewayAgentExecApprovals, upsertGatewayAgentExecApprovals } from "@/lib/gateway/execApprovals";
 import { buildAvatarDataUrl } from "@/lib/avatars/multiavatar";
-// createStudioSettingsCoordinator is now managed by GatewayConnectionProvider
+import { createStudioSettingsCoordinator } from "@/lib/studio/coordinator";
 import { resolveFocusedPreference } from "@/lib/studio/settings";
 import { applySessionSettingMutation } from "@/features/agents/state/sessionSettingsMutations";
 import {
@@ -96,7 +100,6 @@ import {
   isGatewayDisconnectLikeError,
   type EventFrame,
 } from "@/lib/gateway/GatewayClient";
-import { useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
 import { fetchJson } from "@/lib/http";
 import { deleteAgentViaStudio } from "@/features/agents/operations/deleteAgentOperation";
 import { performCronCreateFlow } from "@/features/agents/operations/cronCreateOperation";
@@ -249,6 +252,7 @@ const resolveNextNewAgentName = (agents: AgentState[]) => {
 };
 
 const AgentStudioPage = () => {
+  const [settingsCoordinator] = useState(() => createStudioSettingsCoordinator());
   const {
     client,
     status,
@@ -261,8 +265,7 @@ const AgentStudioPage = () => {
     useLocalGatewayDefaults,
     setGatewayUrl,
     setToken,
-    settingsCoordinator,
-  } = useGatewayConnectionContext();
+  } = useGatewayConnection(settingsCoordinator);
 
   const { state, dispatch, hydrateAgents, setError, setLoading } = useAgentStore();
   const [showConnectionPanel, setShowConnectionPanel] = useState(false);
@@ -332,11 +335,6 @@ const AgentStudioPage = () => {
   const pendingSetupAutoRetryInFlightRef = useRef<Set<string>>(new Set());
 
   const agents = state.agents;
-  const agentsById = useMemo(() => {
-    const map = new Map<string, AgentState>();
-    for (const agent of agents) map.set(agent.agentId, agent);
-    return map;
-  }, [agents]);
   const selectedAgent = useMemo(() => getSelectedAgent(state), [state]);
   const filteredAgents = useMemo(
     () => getFilteredAgents(state, focusFilter),
@@ -360,8 +358,8 @@ const AgentStudioPage = () => {
   }, [focusedAgent]);
   const settingsAgent = useMemo(() => {
     if (!settingsAgentId) return null;
-    return agentsById.get(settingsAgentId) ?? null;
-  }, [agentsById, settingsAgentId]);
+    return agents.find((entry) => entry.agentId === settingsAgentId) ?? null;
+  }, [agents, settingsAgentId]);
   const selectedBrainAgentId = useMemo(() => {
     return focusedAgent?.agentId ?? agents[0]?.agentId ?? null;
   }, [agents, focusedAgent]);
@@ -1368,7 +1366,7 @@ const AgentStudioPage = () => {
         setError("The main agent cannot be deleted.");
         return;
       }
-      const agent = agentsById.get(agentId);
+      const agent = agents.find((entry) => entry.agentId === agentId);
       if (!agent) return;
       const confirmed = window.confirm(
         `Delete ${agent.name}? This removes the agent from gateway config + cron and moves its workspace/state into ~/.openclaw/trash on the gateway host.`
@@ -1455,7 +1453,7 @@ const AgentStudioPage = () => {
       }
     },
     [
-      agentsById,
+      agents,
       client,
       createAgentBlock,
       deleteAgentBlock,
@@ -1821,7 +1819,7 @@ const AgentStudioPage = () => {
 
   const handleNewSession = useCallback(
     async (agentId: string) => {
-      const agent = agentsById.get(agentId);
+      const agent = agents.find((entry) => entry.agentId === agentId);
       if (!agent) {
         setError("Failed to start new session: agent not found.");
         return;
@@ -1854,7 +1852,7 @@ const AgentStudioPage = () => {
         });
       }
     },
-    [agentsById, client, dispatch, setError]
+    [agents, client, dispatch, setError]
   );
 
   useEffect(() => {
@@ -2175,10 +2173,14 @@ const AgentStudioPage = () => {
 
   const handleRenameAgent = useCallback(
     async (agentId: string, name: string) => {
-      if (deleteAgentBlock) return false;
-      if (createAgentBlock) return false;
-      if (renameAgentBlock) return false;
-      const agent = agentsById.get(agentId);
+      const guard = resolveMutationStartGuard({
+        status: "connected",
+        hasCreateBlock: Boolean(createAgentBlock),
+        hasRenameBlock: Boolean(renameAgentBlock),
+        hasDeleteBlock: Boolean(deleteAgentBlock),
+      });
+      if (guard.kind === "deny") return false;
+      const agent = agents.find((entry) => entry.agentId === agentId);
       if (!agent) return false;
       try {
         const queuedRenameBlock = buildQueuedMutationBlock({
@@ -2263,7 +2265,7 @@ const AgentStudioPage = () => {
       }
     },
     [
-      agentsById,
+      agents,
       client,
       createAgentBlock,
       deleteAgentBlock,
@@ -2511,8 +2513,8 @@ const AgentStudioPage = () => {
 
   if (!agentsLoadedOnce && (!didAttemptGatewayConnect || status === "connecting")) {
     return (
-      <div className="relative h-full w-full overflow-hidden bg-background">
-        <div className="flex h-full items-center justify-center px-6">
+      <div className="relative min-h-screen w-screen overflow-hidden bg-background">
+        <div className="flex min-h-screen items-center justify-center px-6">
           <div className="glass-panel w-full max-w-md px-6 py-6 text-center">
             <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               OpenClaw Studio
@@ -2571,7 +2573,7 @@ const AgentStudioPage = () => {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-background">
+    <div className="relative min-h-screen w-screen overflow-hidden bg-background">
       {state.loading ? (
         <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-50 flex justify-center px-3">
           <div className="glass-panel px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -2579,7 +2581,7 @@ const AgentStudioPage = () => {
           </div>
         </div>
       ) : null}
-      <div className="relative z-10 flex h-full flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
+      <div className="relative z-10 flex h-screen flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5">
         <div className="w-full">
           <HeaderBar
             status={status}
@@ -2623,12 +2625,12 @@ const AgentStudioPage = () => {
           </div>
         ) : null}
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 xl:flex-row">
-          <div className="glass-panel p-2 xl:hidden" data-testid="mobile-pane-toggle">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row">
+          <div className="glass-panel bg-surface-1 p-2 xl:hidden" data-testid="mobile-pane-toggle">
             <div className="grid grid-cols-4 gap-2">
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
                   mobilePane === "fleet"
                     ? "border-border bg-surface-2 text-foreground"
                     : "border-border/80 bg-surface-1 text-muted-foreground hover:border-border hover:bg-surface-2"
@@ -2639,7 +2641,7 @@ const AgentStudioPage = () => {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
                   mobilePane === "chat"
                     ? "border-border bg-surface-2 text-foreground"
                     : "border-border/80 bg-surface-1 text-muted-foreground hover:border-border hover:bg-surface-2"
@@ -2650,7 +2652,7 @@ const AgentStudioPage = () => {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
                   mobilePane === "settings"
                     ? "border-border bg-surface-2 text-foreground"
                     : "border-border/80 bg-surface-1 text-muted-foreground hover:border-border hover:bg-surface-2"
@@ -2662,7 +2664,7 @@ const AgentStudioPage = () => {
               </button>
               <button
                 type="button"
-                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition-colors ${
+                className={`rounded-md border px-2 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.13em] transition ${
                   mobilePane === "brain"
                     ? "border-border bg-surface-2 text-foreground"
                     : "border-border/80 bg-surface-1 text-muted-foreground hover:border-border hover:bg-surface-2"
@@ -2699,7 +2701,7 @@ const AgentStudioPage = () => {
             />
           </div>
           <div
-            className={`${mobilePane === "chat" ? "flex" : "hidden"} min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] bg-card shadow-[0_8px_24px_rgba(0,0,0,0.06)] xl:flex`}
+            className={`${mobilePane === "chat" ? "flex" : "hidden"} min-h-0 flex-1 overflow-hidden rounded-md border border-border/80 bg-surface-1 xl:flex`}
             data-testid="focused-agent-panel"
           >
             {focusedAgent ? (
@@ -2865,7 +2867,7 @@ const AgentStudioPage = () => {
       ) : null}
       {createAgentBlock && createAgentBlock.phase !== "queued" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm overscroll-contain"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80"
           data-testid="agent-create-restart-modal"
           role="dialog"
           aria-modal="true"
@@ -2891,7 +2893,7 @@ const AgentStudioPage = () => {
       ) : null}
       {renameAgentBlock && renameAgentBlock.phase !== "queued" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm overscroll-contain"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80"
           data-testid="agent-rename-restart-modal"
           role="dialog"
           aria-modal="true"
@@ -2917,7 +2919,7 @@ const AgentStudioPage = () => {
       ) : null}
       {deleteAgentBlock && deleteAgentBlock.phase !== "queued" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-sm overscroll-contain"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80"
           data-testid="agent-delete-restart-modal"
           role="dialog"
           aria-modal="true"

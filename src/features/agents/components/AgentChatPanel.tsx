@@ -10,7 +10,8 @@ import {
   type MutableRefObject,
 } from "react";
 import type { AgentState as AgentRecord } from "@/features/agents/state/store";
-import { LazyMarkdown } from "@/components/LazyMarkdown";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ChevronRight, Clock, Cog, Copy, Shuffle } from "lucide-react";
 import type { GatewayModelChoice } from "@/lib/gateway/models";
 import { isTraceMarkdown } from "@/lib/text/message-extract";
@@ -44,35 +45,29 @@ const formatDurationLabel = (durationMs: number): string => {
   return `${Math.round(seconds)}s`;
 };
 
+const SPINE_LEFT = "left-[15px]";
 const ASSISTANT_GUTTER_CLASS = "pl-[44px]";
 const ASSISTANT_MAX_WIDTH_DEFAULT_CLASS = "max-w-[68ch]";
-const ASSISTANT_MAX_WIDTH_EXPANDED_CLASS = "max-w-full";
-
-const RE_PATH_ABSOLUTE = /(^|[\s(])(?:[A-Za-z]:\\|~\/|\/)/;
-const RE_PATH_SRC_PREFIX = /(^|[\s(])(src|app|packages|components)\//;
-const RE_PATH_FILE_EXT = /(^|[\s(])[\w.-]+\.(ts|tsx|js|jsx|json|md|py|go|rs|java|kt|rb|sh|yaml|yml)\b/;
-
-const RE_MD_CODE_FENCE = /```/;
-const RE_MD_HEADING = /^\s*#{1,6}\s+/m;
-const RE_MD_LIST = /^\s*[-*+]\s+/m;
-const RE_MD_ORDERED_LIST = /^\s*\d+\.\s+/m;
-const RE_MD_TABLE = /^\s*\|.+\|\s*$/m;
+const ASSISTANT_MAX_WIDTH_EXPANDED_CLASS = "max-w-[1120px]";
+const CHAT_TOP_THRESHOLD_PX = 8;
 
 const looksLikePath = (value: string): boolean => {
   if (!value) return false;
-  if (RE_PATH_ABSOLUTE.test(value)) return true;
-  if (RE_PATH_SRC_PREFIX.test(value)) return true;
-  if (RE_PATH_FILE_EXT.test(value)) return true;
+  if (/(^|[\s(])(?:[A-Za-z]:\\|~\/|\/)/.test(value)) return true;
+  if (/(^|[\s(])(src|app|packages|components)\//.test(value)) return true;
+  if (/(^|[\s(])[\w.-]+\.(ts|tsx|js|jsx|json|md|py|go|rs|java|kt|rb|sh|yaml|yml)\b/.test(value)) {
+    return true;
+  }
   return false;
 };
 
 const isStructuredMarkdown = (text: string): boolean => {
   if (!text) return false;
-  if (RE_MD_CODE_FENCE.test(text)) return true;
-  if (RE_MD_HEADING.test(text)) return true;
-  if (RE_MD_LIST.test(text)) return true;
-  if (RE_MD_ORDERED_LIST.test(text)) return true;
-  if (RE_MD_TABLE.test(text)) return true;
+  if (/```/.test(text)) return true;
+  if (/^\s*#{1,6}\s+/m.test(text)) return true;
+  if (/^\s*[-*+]\s+/m.test(text)) return true;
+  if (/^\s*\d+\.\s+/m.test(text)) return true;
+  if (/^\s*\|.+\|\s*$/m.test(text)) return true;
   if (looksLikePath(text) && text.split("\n").filter(Boolean).length >= 3) return true;
   return false;
 };
@@ -236,7 +231,7 @@ const ThinkingDetailsRow = memo(function ThinkingDetailsRow({
         </span>
       </summary>
       <div className="agent-markdown mt-2 min-w-0 pl-5 text-foreground/85">
-        <LazyMarkdown>{thinkingText}</LazyMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{thinkingText}</ReactMarkdown>
       </div>
     </details>
   );
@@ -250,8 +245,8 @@ const UserMessageCard = memo(function UserMessageCard({
   timestampMs?: number;
 }) {
   return (
-    <div className="w-full max-w-[min(80%,640px)] overflow-hidden rounded-[8px] bg-primary/10">
-      <div className="flex items-center justify-between gap-3 bg-primary/15 px-3 py-2">
+    <div className="w-full max-w-[70ch] self-end overflow-hidden rounded-[8px] border border-primary/25 bg-primary/12">
+      <div className="flex items-center justify-between gap-3 bg-primary/18 px-3 py-2">
         <div className="min-w-0 truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground/90">
           You
         </div>
@@ -262,7 +257,7 @@ const UserMessageCard = memo(function UserMessageCard({
         ) : null}
       </div>
       <div className="agent-markdown px-3 py-2.5 text-foreground">
-        <LazyMarkdown>{text}</LazyMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
       </div>
     </div>
   );
@@ -298,8 +293,8 @@ const AssistantMessageCard = memo(function AssistantMessageCard({
   const compactStreamingIndicator = Boolean(streaming && !hasThinking && !hasContent);
 
   return (
-    <div className="w-full max-w-[min(80%,640px)]">
-      <div className={`relative w-full ${widthClass} ${ASSISTANT_GUTTER_CLASS} rounded-[8px] bg-muted/40 py-2 pr-2`}>
+    <div className="w-full self-start">
+      <div className={`relative w-full ${widthClass} ${ASSISTANT_GUTTER_CLASS}`}>
         <div className="absolute left-[4px] top-[2px]">
           <AgentAvatar seed={avatarSeed} name={name} avatarUrl={avatarUrl} size={22} />
         </div>
@@ -386,7 +381,9 @@ const AssistantMessageCard = memo(function AssistantMessageCard({
                 <>
                   {!artifactOnly && intro ? (
                     <div className="agent-markdown text-foreground">
-                      <LazyMarkdown>{intro}</LazyMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {rewriteMediaLinesToMarkdown(intro)}
+                      </ReactMarkdown>
                     </div>
                   ) : null}
                   <div className="group rounded-[8px] border border-border/70 bg-surface-3 px-3 py-2">
@@ -396,7 +393,7 @@ const AssistantMessageCard = memo(function AssistantMessageCard({
                       </div>
                       <button
                         type="button"
-                        className="rounded-[8px] bg-card/60 p-1.5 text-muted-foreground opacity-0 transition hover:bg-card group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        className="rounded-[8px] bg-surface-1 p-1.5 text-muted-foreground opacity-0 transition hover:bg-surface-2 group-hover:opacity-100"
                         aria-label="Extract output"
                         title="Copy output"
                         onClick={() => {
@@ -410,13 +407,17 @@ const AssistantMessageCard = memo(function AssistantMessageCard({
                       </button>
                     </div>
                     <div className="agent-markdown text-foreground">
-                      <LazyMarkdown>{artifact}</LazyMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {rewriteMediaLinesToMarkdown(artifact)}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="agent-markdown text-foreground">
-                  <LazyMarkdown>{contentText}</LazyMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {rewriteMediaLinesToMarkdown(contentText)}
+                  </ReactMarkdown>
                 </div>
               )
             ) : null}
@@ -496,60 +497,48 @@ const AgentChatFinalItems = memo(function AgentChatFinalItems({
   return (
     <>
       {blocks.map((block, index) => {
-        const prevKind = index > 0 ? blocks[index - 1]?.kind : undefined;
-        const isAssistantGroup =
-          block.kind === "assistant" || block.kind === "tool";
-        const prevIsAssistantGroup =
-          prevKind === "assistant" || prevKind === "tool";
-        const sameSender =
-          (block.kind === "user" && prevKind === "user") ||
-          (isAssistantGroup && prevIsAssistantGroup);
-        const gapClass =
-          index === 0 ? "" : sameSender ? "mt-1.5" : "mt-4";
-
         if (block.kind === "user") {
           return (
-            <div key={`chat-${agentId}-user-${index}`} className={`flex justify-end ${gapClass}`}>
-              <UserMessageCard
-                text={block.text}
-                timestampMs={block.timestampMs}
-              />
-            </div>
+            <UserMessageCard
+              key={`chat-${agentId}-user-${index}`}
+              text={block.text}
+              timestampMs={block.timestampMs}
+            />
           );
         }
         if (block.kind === "tool") {
           const { summaryText, body } = summarizeToolLabel(block.text);
           return (
-            <div key={`chat-${agentId}-tool-${index}`} className={`flex justify-start ${gapClass}`}>
-              <details
-                className={`w-full max-w-[min(80%,640px)] ${ASSISTANT_GUTTER_CLASS} rounded-[8px] bg-background px-2 py-1 text-[10px] text-muted-foreground`}
-              >
-                  <summary className="cursor-pointer select-none font-mono text-[10px] font-semibold uppercase tracking-[0.11em]">
-                    {summaryText}
-                  </summary>
-                  {body ? (
-                    <div className="agent-markdown mt-1 text-foreground">
-                      <LazyMarkdown>{body}</LazyMarkdown>
-                    </div>
-                  ) : null}
-              </details>
-            </div>
+            <details
+              key={`chat-${agentId}-tool-${index}`}
+              className={`w-full ${ASSISTANT_MAX_WIDTH_EXPANDED_CLASS} ${ASSISTANT_GUTTER_CLASS} self-start rounded-[8px] border border-border/70 bg-surface-3 px-2 py-1 text-[10px] text-muted-foreground`}
+            >
+                <summary className="cursor-pointer select-none font-mono text-[10px] font-semibold tracking-[0.11em]">
+                  {summaryText}
+                </summary>
+                {body ? (
+                  <div className="agent-markdown agent-tool-markdown mt-1 text-foreground">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {rewriteMediaLinesToMarkdown(body)}
+                    </ReactMarkdown>
+                  </div>
+                ) : null}
+            </details>
           );
         }
         const streaming = running && index === blocks.length - 1 && !block.text;
         return (
-          <div key={`chat-${agentId}-assistant-${index}`} className={`flex justify-start ${gapClass}`}>
-            <AssistantMessageCard
-              avatarSeed={avatarSeed}
-              avatarUrl={avatarUrl}
-              name={name}
-              timestampMs={block.timestampMs ?? (streaming ? runStartedAt ?? undefined : undefined)}
-              thinkingText={block.thinkingText ?? null}
-              thinkingDurationMs={block.thinkingDurationMs}
-              contentText={block.text}
-              streaming={streaming}
-            />
-          </div>
+          <AssistantMessageCard
+            key={`chat-${agentId}-assistant-${index}`}
+            avatarSeed={avatarSeed}
+            avatarUrl={avatarUrl}
+            name={name}
+            timestampMs={block.timestampMs ?? (streaming ? runStartedAt ?? undefined : undefined)}
+            thinkingText={block.thinkingText ?? null}
+            thinkingDurationMs={block.thinkingDurationMs}
+            contentText={block.text}
+            streaming={streaming}
+          />
         );
       })}
     </>
@@ -717,9 +706,10 @@ const AgentChatTranscript = memo(function AgentChatTranscript({
           event.stopPropagation();
         }}
       >
-        <div className="relative flex flex-col text-xs text-foreground">
-          {historyMaybeTruncated ? (
-            <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between gap-3 rounded-[10px] border border-border/60 bg-card/85 px-3 py-2 backdrop-blur">
+        <div className="relative flex flex-col gap-4 text-xs text-foreground">
+          <div aria-hidden className={`pointer-events-none absolute ${SPINE_LEFT} top-0 bottom-0 w-px bg-border/20`} />
+          {historyMaybeTruncated && isAtTop ? (
+            <div className="-mx-1 flex items-center justify-between gap-3 rounded-[10px] border border-border/70 bg-surface-2 px-3 py-2">
               <div className="min-w-0 truncate font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Showing most recent {typeof historyFetchedCount === "number" ? historyFetchedCount : "?"} messages
                 {typeof historyFetchLimit === "number" ? ` (limit ${historyFetchLimit})` : ""}
@@ -753,31 +743,23 @@ const AgentChatTranscript = memo(function AgentChatTranscript({
                 running={status === "running"}
                 runStartedAt={runStartedAt}
               />
-              {liveThinkingText || liveAssistantText || showTypingIndicator ? (() => {
-                const lastItem = chatItems[chatItems.length - 1];
-                const lastKind = lastItem?.kind;
-                const liveGap = chatItems.length === 0 ? "" :
-                  (lastKind === "assistant" || lastKind === "tool" || lastKind === "thinking") ? "mt-1.5" : "mt-4";
-                return (
-                  <div className={`flex justify-start ${liveGap}`}>
-                    <AssistantMessageCard
-                      avatarSeed={avatarSeed}
-                      avatarUrl={avatarUrl}
-                      name={name}
-                      timestampMs={runStartedAt ?? undefined}
-                      thinkingText={liveThinkingText || null}
-                      thinkingDurationMs={
-                        typeof runStartedAt === "number" && typeof nowMs === "number"
-                          ? Math.max(0, nowMs - runStartedAt)
-                          : undefined
-                      }
-                      showTypingIndicator={showTypingIndicator}
-                      contentText={liveAssistantText || null}
-                      streaming={status === "running"}
-                    />
-                  </div>
-                );
-              })() : null}
+              {liveThinkingText || liveAssistantText || showTypingIndicator ? (
+                <AssistantMessageCard
+                  avatarSeed={avatarSeed}
+                  avatarUrl={avatarUrl}
+                  name={name}
+                  timestampMs={runStartedAt ?? undefined}
+                  thinkingText={liveThinkingText || null}
+                  thinkingDurationMs={
+                    typeof runStartedAt === "number" && typeof nowMs === "number"
+                      ? Math.max(0, nowMs - runStartedAt)
+                      : undefined
+                  }
+                  showTypingIndicator={showTypingIndicator}
+                  contentText={liveAssistantText || null}
+                  streaming={status === "running"}
+                />
+              ) : null}
               <div ref={chatBottomRef} />
             </>
           )}
@@ -835,10 +817,10 @@ const AgentChatComposer = memo(function AgentChatComposer({
         ref={inputRef}
         rows={1}
         value={value}
-        className="flex-1 resize-none rounded-[8px] border border-border/60 bg-background px-3 py-2 text-[11px] text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="flex-1 resize-none rounded-[8px] border border-border/70 bg-surface-3 px-3 py-2 text-[11px] text-foreground outline-none transition"
         onChange={onChange}
         onKeyDown={onKeyDown}
-        placeholder="Type a message…"
+        placeholder="type a message"
       />
       {running ? (
         <span className="inline-flex" title={stopReason || undefined}>

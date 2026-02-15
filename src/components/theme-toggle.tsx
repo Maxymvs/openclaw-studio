@@ -21,14 +21,14 @@ const applyTheme = (mode: ThemeMode) => {
 };
 
 export const ThemeToggle = () => {
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") return "light";
-    return getPreferredTheme();
-  });
+  // Keep SSR + initial hydration stable ("light") to avoid markup mismatch.
+  const [theme, setTheme] = useState<ThemeMode>("light");
 
   useEffect(() => {
-    applyTheme(theme);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const preferred = getPreferredTheme();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTheme(preferred);
+    applyTheme(preferred);
   }, []);
 
   const toggleTheme = () => {
@@ -49,7 +49,7 @@ export const ThemeToggle = () => {
       type="button"
       onClick={toggleTheme}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input/90 bg-background/75 text-foreground shadow-sm transition hover:border-ring hover:bg-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input/90 bg-surface-3 text-foreground transition hover:border-border hover:bg-surface-2"
     >
       {isDark ? <Sun className="h-[15px] w-[15px]" /> : <Moon className="h-[15px] w-[15px]" />}
     </button>

@@ -419,14 +419,10 @@ export const buildSummarySnapshotPatches = ({
           patch.lastAssistantMessageAt = activity;
         }
       }
-      let lastAssistant: (typeof preview.items)[number] | undefined;
-      let lastUser: (typeof preview.items)[number] | undefined;
-      for (let i = preview.items.length - 1; i >= 0; i--) {
-        const item = preview.items[i];
-        if (!lastAssistant && item.role === "assistant") lastAssistant = item;
-        if (!lastUser && item.role === "user") lastUser = item;
-        if (lastAssistant && lastUser) break;
-      }
+      const lastAssistant = [...preview.items]
+        .reverse()
+        .find((item) => item.role === "assistant");
+      const lastUser = [...preview.items].reverse().find((item) => item.role === "user");
       if (lastAssistant?.text) {
         patch.latestPreview = stripUiMetadata(lastAssistant.text);
       }
