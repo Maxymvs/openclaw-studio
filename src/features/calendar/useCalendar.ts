@@ -6,7 +6,8 @@ import { listCronJobs, runCronJobNow, removeCronJob } from "@/lib/cron/types";
 import type { CronJobSummary } from "@/lib/cron/types";
 import { startOfWeek, getWeekDays } from "@/lib/datetime/format";
 import { projectAllJobsToSlots } from "./cronProjection";
-import type { CalendarDay } from "./types";
+import type { CalendarDay, CalendarFilters } from "./types";
+import { defaultCalendarFilters } from "./types";
 
 export type UseCalendarReturn = {
   weekStart: Date;
@@ -14,6 +15,8 @@ export type UseCalendarReturn = {
   jobs: CronJobSummary[];
   loading: boolean;
   error: string | null;
+  filters: CalendarFilters;
+  setFilters: React.Dispatch<React.SetStateAction<CalendarFilters>>;
   goToPrevWeek: () => void;
   goToNextWeek: () => void;
   goToThisWeek: () => void;
@@ -29,6 +32,7 @@ export function useCalendar(
   const [jobs, setJobs] = useState<CronJobSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<CalendarFilters>(defaultCalendarFilters);
 
   const fetchJobs = useCallback(async () => {
     if (!client) return;
@@ -50,7 +54,7 @@ export function useCalendar(
 
   const weekDays = getWeekDays(weekStart);
   const weekEndMs = new Date(weekStart).setDate(weekStart.getDate() + 7);
-  const slots = projectAllJobsToSlots(jobs, weekStart.getTime(), weekEndMs);
+  const slots = projectAllJobsToSlots(jobs, weekStart.getTime(), weekEndMs, filters);
 
   const days: CalendarDay[] = weekDays.map((date) => {
     const dayStart = new Date(date);
@@ -119,6 +123,8 @@ export function useCalendar(
     jobs,
     loading,
     error,
+    filters,
+    setFilters,
     goToPrevWeek,
     goToNextWeek,
     goToThisWeek,

@@ -11,9 +11,10 @@ type SlotCardProps = {
 };
 
 function SlotCard({ slot, onRun, onDelete }: SlotCardProps) {
+  const disabled = !slot.job.enabled;
   return (
     <div
-      className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs mb-1 group"
+      className={`bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs mb-1 group${disabled ? " opacity-50" : ""}`}
       data-testid="calendar-slot"
     >
       <div className="flex items-center justify-between">

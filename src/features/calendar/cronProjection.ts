@@ -3,7 +3,7 @@
  */
 
 import type { CronJobSummary, CronSchedule } from "@/lib/cron/types";
-import type { CalendarSlot } from "./types";
+import type { CalendarSlot, CalendarFilters } from "./types";
 
 /**
  * Simple cron expression parser for common patterns.
@@ -113,10 +113,17 @@ export const projectJobToSlots = (
 export const projectAllJobsToSlots = (
   jobs: CronJobSummary[],
   startMs: number,
-  endMs: number
+  endMs: number,
+  filters?: CalendarFilters
 ): CalendarSlot[] => {
   return jobs
-    .filter((j) => j.enabled)
+    .filter((j) => {
+      if (!filters) return j.enabled;
+      if (!filters.showDisabled && !j.enabled) return false;
+      if (!filters.scheduleTypes.includes(j.schedule.kind)) return false;
+      if (!filters.payloadTypes.includes(j.payload.kind)) return false;
+      return true;
+    })
     .flatMap((j) => projectJobToSlots(j, startMs, endMs))
     .sort((a, b) => a.startMs - b.startMs);
 };
