@@ -22,7 +22,7 @@ export default function SearchPage() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full min-h-0 bg-zinc-950">
       <header className="px-4 py-3 border-b border-zinc-800">
         <h1 className="text-lg font-semibold text-zinc-100">Search</h1>
         <p className="text-xs text-zinc-500 mt-0.5">

@@ -55,7 +55,7 @@ type WeeklyGridProps = {
 export function WeeklyGrid({ days, onRunJob, onDeleteJob }: WeeklyGridProps) {
   return (
     <div
-      className="grid grid-cols-7 gap-px bg-zinc-800 flex-1 overflow-auto"
+      className="grid grid-cols-7 gap-px bg-zinc-800 flex-1 min-h-0 overflow-auto"
       data-testid="calendar-grid"
     >
       {days.map((day) => (

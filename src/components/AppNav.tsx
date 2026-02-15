@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Activity, Calendar, Search } from "lucide-react";
+import { Users, Activity, Calendar, Search, ClipboardList } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { href: "/activity", label: "Activity", icon: <Activity size={18} /> },
   { href: "/calendar", label: "Calendar", icon: <Calendar size={18} /> },
   { href: "/search", label: "Search", icon: <Search size={18} /> },
+  { href: "/tasks", label: "Tasks", icon: <ClipboardList size={18} /> },
 ];
 
 export function AppNav() {

@@ -1674,8 +1674,8 @@ const AgentStudioPage = () => {
 
   if (status === "connecting" || (status === "connected" && !agentsLoadedOnce)) {
     return (
-      <div className="relative min-h-screen w-screen overflow-hidden bg-background">
-        <div className="flex min-h-screen items-center justify-center px-6">
+      <div className="relative h-full w-full overflow-hidden bg-background">
+        <div className="flex h-full items-center justify-center px-6">
           <div className="glass-panel w-full max-w-md px-6 py-6 text-center">
             <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               OpenClaw Studio
@@ -1690,7 +1690,7 @@ const AgentStudioPage = () => {
   }
 
   return (
-    <div className="relative min-h-screen w-screen overflow-hidden bg-background">
+    <div className="relative h-full w-full overflow-hidden bg-background">
       {state.loading ? (
         <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-50 flex justify-center px-3">
           <div className="glass-panel px-6 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -1698,7 +1698,7 @@ const AgentStudioPage = () => {
           </div>
         </div>
       ) : null}
-      <div className="relative z-10 flex h-screen flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
+      <div className="relative z-10 flex h-full flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
         <div className="w-full">
           <HeaderBar
             status={status}
@@ -1741,7 +1741,7 @@ const AgentStudioPage = () => {
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 xl:flex-row">
           <div className="glass-panel p-2 xl:hidden" data-testid="mobile-pane-toggle">
             <div className="grid grid-cols-4 gap-2">
               <button
@@ -1817,7 +1817,7 @@ const AgentStudioPage = () => {
             />
           </div>
           <div
-            className={`${mobilePane === "chat" ? "flex" : "hidden"} min-h-0 flex-1 overflow-hidden rounded-[16px] bg-card shadow-[0_8px_24px_rgba(0,0,0,0.06)] xl:flex`}
+            className={`${mobilePane === "chat" ? "flex" : "hidden"} min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] bg-card shadow-[0_8px_24px_rgba(0,0,0,0.06)] xl:flex`}
             data-testid="focused-agent-panel"
           >
             {focusedAgent ? (
