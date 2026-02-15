@@ -6,6 +6,32 @@ import type { CronJobSummary, CronSchedule } from "@/lib/cron/types";
 import type { CalendarSlot, CalendarFilters } from "./types";
 
 /**
+ * Expand a single cron field into matching values.
+ * Supports: literal, wildcard, step (star-slash-N).
+ */
+const expandCronField = (field: string, min: number, max: number): number[] => {
+  // */N step
+  const stepMatch = field.match(/^\*\/(\d+)$/);
+  if (stepMatch) {
+    const step = parseInt(stepMatch[1], 10);
+    if (step <= 0) return [];
+    const vals: number[] = [];
+    for (let v = min; v <= max; v += step) vals.push(v);
+    return vals;
+  }
+  // Wildcard
+  if (field === "*") {
+    const vals: number[] = [];
+    for (let v = min; v <= max; v++) vals.push(v);
+    return vals;
+  }
+  // Literal number
+  const num = parseInt(field, 10);
+  if (!isNaN(num) && num >= min && num <= max) return [num];
+  return [];
+};
+
+/**
  * Simple cron expression parser for common patterns.
  * Supports: "m h * * *" (daily at h:m), "m h * * d" (weekly on day d).
  * Returns occurrences within [startMs, endMs).
@@ -19,15 +45,16 @@ const projectCronExpr = (
   const parts = expr.trim().split(/\s+/);
   if (parts.length < 5) return [];
 
-  const minute = parseInt(parts[0], 10);
-  const hour = parseInt(parts[1], 10);
   const dayOfWeek = parts[4];
 
-  if (isNaN(minute) || isNaN(hour)) return [];
+  // Parse minute field (supports: "0", "*", "*/15")
+  const minutes = expandCronField(parts[0], 0, 59);
+  // Parse hour field (supports: "12", "*", "*/6")
+  const hours = expandCronField(parts[1], 0, 23);
+
+  if (minutes.length === 0 || hours.length === 0) return [];
 
   const results: number[] = [];
-  const current = new Date(startMs);
-  current.setHours(hour, minute, 0, 0);
 
   // Walk day by day
   const start = new Date(startMs);
@@ -36,17 +63,20 @@ const projectCronExpr = (
   for (let d = 0; d < 7; d++) {
     const day = new Date(start);
     day.setDate(day.getDate() + d);
-    day.setHours(hour, minute, 0, 0);
 
-    const ts = day.getTime();
-    if (ts < startMs || ts >= endMs) continue;
-
-    if (dayOfWeek === "*") {
-      results.push(ts);
-    } else {
+    if (dayOfWeek !== "*") {
       const dow = parseInt(dayOfWeek, 10);
-      if (!isNaN(dow) && day.getDay() === dow) {
-        results.push(ts);
+      if (isNaN(dow) || day.getDay() !== dow) continue;
+    }
+
+    for (const hour of hours) {
+      for (const minute of minutes) {
+        const slot = new Date(day);
+        slot.setHours(hour, minute, 0, 0);
+        const ts = slot.getTime();
+        if (ts >= startMs && ts < endMs) {
+          results.push(ts);
+        }
       }
     }
   }
