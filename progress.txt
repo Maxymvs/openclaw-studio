@@ -1,0 +1,28 @@
+# Dashboard Pages Progress
+
+## Completed Stories
+- DASH-001: Shared: WebSocket event subscription hook (commit 073fac4)
+  - Created `src/lib/gateway/useGatewayEvents.ts` — reusable hook accepting GatewayClient, filter (string/array/predicate/null), and callback
+  - 6 unit tests covering: subscribe/unsubscribe lifecycle, null filter, string filter, array filter, predicate filter, null client
+
+- DASH-002: Shared: App-level navigation sidebar (commit c8042ef)
+  - Created `src/components/AppNav.tsx` — client component with 4 nav links (/, /activity, /calendar, /search) using lucide icons, active state via `usePathname`, collapsible sidebar
+  - Integrated into `src/app/layout.tsx` with flex layout wrapper
+  - Updated `vitest.config.ts` to include `.tsx` test files
+  - 5 tests: renders all links, correct hrefs, active highlighting for root/sub-routes
+
+## Codebase Patterns
+- GatewayClient lives in `src/lib/gateway/GatewayClient.ts`, exposes `onEvent(handler)` returning unsubscribe fn
+- Client is created via `useGatewayConnection()` hook in page.tsx — not in a React context (yet)
+- Tests go in `tests/unit/*.test.ts`, use vitest + jsdom + @testing-library/react
+- Mock GatewayClient by creating object with `onEvent: vi.fn()` and casting as `unknown as GatewayClient`
+- Type vi.fn callbacks explicitly to pass tsc: `vi.fn<(e: EventFrame) => void>()`
+- For React component tests (.tsx), use cleanup() in afterEach to avoid duplicate element issues
+- Use `vi.mock("next/navigation", ...)` to mock usePathname in nav tests
+- vitest config includes `{ts,tsx}` for test files
+
+- DASH-003: Shared: Gateway connection context for sub-pages (commit 56610d3)
+  - Created `src/lib/gateway/GatewayConnectionContext.tsx` — GatewayConnectionProvider + useGatewayConnectionContext hook
+  - Provider wraps app in layout.tsx, exposes client, status, gatewayUrl, token, settingsCoordinator
+  - Updated page.tsx to consume context instead of calling useGatewayConnection directly
+  - 4 unit tests: provides client/status, provides functions, throws outside provider, exposes coordinator

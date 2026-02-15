@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, CalendarDays, ListChecks, Play, Sun, Trash2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Play, Trash2 } from "lucide-react";
+import { LazyMarkdown } from "@/components/LazyMarkdown";
 
 import type { AgentState } from "@/features/agents/state/store";
 import type { CronCreateDraft, CronCreateTemplateId } from "@/lib/cron/createPayloadBuilder";
@@ -113,7 +112,7 @@ const getFirstLinePreview = (value: string, maxChars: number): string => {
       .find((line) => line.length > 0) ?? "";
   if (!firstLine) return "";
   if (firstLine.length <= maxChars) return firstLine;
-  return `${firstLine.slice(0, maxChars)}...`;
+  return `${firstLine.slice(0, maxChars)}\u2026`;
 };
 
 type CronTemplateOption = {
@@ -467,7 +466,7 @@ export const AgentSettingsPanel = ({
             <span>Agent name</span>
             <input
               aria-label="Agent name"
-              className="h-10 rounded-md border border-border bg-surface-3 px-3 text-xs font-semibold text-foreground outline-none"
+              className="h-10 rounded-md border border-border bg-card/75 px-3 text-xs font-semibold text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
               value={nameDraft}
               disabled={renameSaving}
               onChange={(event) => setNameDraft(event.target.value)}
@@ -487,7 +486,7 @@ export const AgentSettingsPanel = ({
               }}
               disabled={renameSaving}
             >
-              {renameSaving ? "Saving..." : "Update Name"}
+              {renameSaving ? "Saving\u2026" : "Update Name"}
             </button>
           </div>
         </section>
@@ -580,7 +579,7 @@ export const AgentSettingsPanel = ({
             }}
             disabled={sessionBusy}
           >
-            {sessionBusy ? "Starting..." : "New session"}
+            {sessionBusy ? "Starting\u2026" : "New session"}
           </button>
         </section>
 
@@ -603,7 +602,7 @@ export const AgentSettingsPanel = ({
             ) : null}
           </div>
           {cronLoading ? (
-            <div className="mt-3 text-[11px] text-muted-foreground">Loading cron jobs...</div>
+            <div className="mt-3 text-[11px] text-muted-foreground">Loading cron jobs\u2026</div>
           ) : null}
           {!cronLoading && cronError ? (
             <div className="mt-3 rounded-md border border-destructive bg-destructive px-3 py-2 text-xs text-destructive-foreground">
@@ -735,7 +734,7 @@ export const AgentSettingsPanel = ({
             Heartbeats
           </div>
           {heartbeatLoading ? (
-            <div className="mt-3 text-[11px] text-muted-foreground">Loading heartbeats...</div>
+            <div className="mt-3 text-[11px] text-muted-foreground">Loading heartbeats\u2026</div>
           ) : null}
           {!heartbeatLoading && heartbeatError ? (
             <div className="mt-3 rounded-md border border-destructive bg-destructive px-3 py-2 text-xs text-destructive-foreground">
@@ -1423,14 +1422,14 @@ export const AgentBrainPanel = ({
                     {AGENT_FILE_PLACEHOLDERS[agentFileTab]}
                   </p>
                 ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <LazyMarkdown>
                     {agentFiles[agentFileTab].content}
-                  </ReactMarkdown>
+                  </LazyMarkdown>
                 )}
               </div>
             ) : (
               <textarea
-                className="h-full min-h-0 w-full resize-none overflow-y-auto rounded-md border border-border/80 bg-background/80 px-3 py-2 font-mono text-xs text-foreground outline-none"
+                className="h-full min-h-0 w-full resize-none overflow-y-auto rounded-md border border-border/80 bg-background/80 px-3 py-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 value={agentFiles[agentFileTab].content}
                 placeholder={
                   agentFiles[agentFileTab].content.trim().length === 0

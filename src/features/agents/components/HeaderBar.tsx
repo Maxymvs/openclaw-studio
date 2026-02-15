@@ -61,7 +61,7 @@ export const HeaderBar = ({
           ) : null}
           <ThemeToggle />
           <button
-            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
               brainFilesOpen
                 ? "border-border bg-surface-2 text-foreground"
                 : "border-input/90 bg-surface-3 text-foreground hover:border-border hover:bg-surface-2"
@@ -74,8 +74,15 @@ export const HeaderBar = ({
             <Brain className="h-4 w-4" />
             Brain
           </button>
-          {showConnectionSettings ? (
-            <div className="relative z-[210]" ref={menuRef}>
+          <details className="group relative">
+            <summary
+              className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-input/80 bg-background/70 text-muted-foreground transition hover:border-ring hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
+              data-testid="studio-menu-toggle"
+            >
+              <Ellipsis className="h-4 w-4" />
+              <span className="sr-only">Open studio menu</span>
+            </summary>
+            <div className="absolute right-0 top-11 z-20 min-w-44 rounded-md border border-border/80 bg-popover/95 p-1 shadow-lg backdrop-blur">
               <button
                 type="button"
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-input/80 bg-surface-3 text-muted-foreground transition hover:border-border hover:bg-surface-2 hover:text-foreground"
