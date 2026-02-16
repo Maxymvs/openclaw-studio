@@ -1,11 +1,11 @@
 "use client";
 
-import { useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
+import { GatewayConnectionProvider, useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
 import { useActivityFeed } from "@/features/activity/useActivityFeed";
 import { ActivityEventList } from "@/features/activity/components/ActivityEventList";
 import { ActivityFiltersBar } from "@/features/activity/components/ActivityFilters";
 
-export default function ActivityPage() {
+function _ActivityPageInner() {
   const { client, status } = useGatewayConnectionContext();
   const {
     filteredEvents,
@@ -36,5 +36,13 @@ export default function ActivityPage() {
       />
       <ActivityEventList events={filteredEvents} />
     </div>
+  );
+}
+
+export default function ActivityPage() {
+  return (
+    <GatewayConnectionProvider>
+      <_ActivityPageInner />
+    </GatewayConnectionProvider>
   );
 }

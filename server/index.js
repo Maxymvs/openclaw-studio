@@ -8,6 +8,7 @@ const { loadUpstreamGatewaySettings } = require("./studio-settings");
 const resolveHost = () => {
   const fromEnv = process.env.HOST?.trim() || process.env.HOSTNAME?.trim();
   if (fromEnv) return fromEnv;
+  if (process.argv.includes("--dev")) return "localhost";
   return "0.0.0.0";
 };
 

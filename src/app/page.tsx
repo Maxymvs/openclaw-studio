@@ -97,6 +97,7 @@ import {
 } from "@/features/agents/operations/guidedCreateWorkflow";
 import { applyPendingGuidedSetupRetryViaStudio } from "@/features/agents/operations/pendingGuidedSetupRetryOperation";
 import {
+  GatewayResponseError,
   isGatewayDisconnectLikeError,
   type EventFrame,
 } from "@/lib/gateway/GatewayClient";
@@ -163,6 +164,14 @@ type ChatHistoryResult = {
   sessionId?: string;
   messages: ChatHistoryMessage[];
   thinkingLevel?: string;
+};
+
+const logGatewayError = (message: string, error?: unknown): void => {
+  if (error instanceof GatewayResponseError && error.message.includes("missing scope")) {
+    console.warn(message, error.message);
+  } else {
+    console.error(message, error);
+  }
 };
 
 const DEFAULT_CHAT_HISTORY_LIMIT = 200;
@@ -678,7 +687,7 @@ const AgentStudioPage = () => {
         cachedConfigSnapshot: gatewayConfigSnapshot,
         loadStudioSettings: () => settingsCoordinator.loadSettings(),
         isDisconnectLikeError: isGatewayDisconnectLikeError,
-        logError: (message, error) => console.error(message, error),
+        logError: logGatewayError,
       });
       if (!gatewayConfigSnapshot && result.configSnapshot) {
         setGatewayConfigSnapshot(result.configSnapshot);
@@ -1405,7 +1414,7 @@ const AgentStudioPage = () => {
                     client,
                     agentId,
                     fetchJson,
-                    logError: (message, error) => console.error(message, error),
+                    logError: logGatewayError,
                   });
                   setSettingsAgentId(null);
                 },
@@ -1413,7 +1422,7 @@ const AgentStudioPage = () => {
                   shouldAwaitDisconnectRestartForRemoteMutation({
                     client,
                     cachedConfigSnapshot: gatewayConfigSnapshot,
-                    logError: (message, error) => console.error(message, error),
+                    logError: logGatewayError,
                   }),
               }
             );
@@ -2223,7 +2232,7 @@ const AgentStudioPage = () => {
                   shouldAwaitDisconnectRestartForRemoteMutation({
                     client,
                     cachedConfigSnapshot: gatewayConfigSnapshot,
-                    logError: (message, error) => console.error(message, error),
+                    logError: logGatewayError,
                   }),
               }
             );

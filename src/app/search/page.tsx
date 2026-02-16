@@ -2,12 +2,12 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
+import { GatewayConnectionProvider, useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
 import { useSearch } from "@/features/search/useSearch";
 import { SearchInput } from "@/features/search/components/SearchInput";
 import { SearchResults } from "@/features/search/components/SearchResults";
 
-export default function SearchPage() {
+function _SearchPageInner() {
   const { gatewayUrl, token, status } = useGatewayConnectionContext();
   const router = useRouter();
   const { query, setQuery, results, totalMatches, loading, error, search } =
@@ -69,5 +69,13 @@ export default function SearchPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <GatewayConnectionProvider>
+      <_SearchPageInner />
+    </GatewayConnectionProvider>
   );
 }

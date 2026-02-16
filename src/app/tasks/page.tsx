@@ -11,7 +11,7 @@ import {
   type Priority,
   type Task,
 } from "@/features/tasks/types";
-import { useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
+import { GatewayConnectionProvider, useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
 
 type GatewayAgent = { name: string; agentId: string };
 
@@ -321,7 +321,7 @@ function TaskCreateForm({
 
 /* ── Page ──────────────────────────────────────────────────── */
 
-export default function TasksPage() {
+function _TasksPageInner() {
   const { client, status } = useGatewayConnectionContext();
   const gatewayAgents = useGatewayAgents();
   const {
@@ -469,5 +469,13 @@ export default function TasksPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <GatewayConnectionProvider>
+      <_TasksPageInner />
+    </GatewayConnectionProvider>
   );
 }

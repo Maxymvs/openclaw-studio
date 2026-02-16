@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
+import { GatewayConnectionProvider, useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
 import { useCalendar } from "@/features/calendar/useCalendar";
 import { WeeklyGrid } from "@/features/calendar/components/WeeklyGrid";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -33,7 +33,7 @@ function toggleArrayItem<T>(arr: T[], item: T): T[] {
   return arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
 }
 
-export default function CalendarPage() {
+function _CalendarPageInner() {
   const { client, status } = useGatewayConnectionContext();
   const {
     weekStart,
@@ -191,5 +191,13 @@ export default function CalendarPage() {
         <WeeklyGrid days={days} onRunJob={runJob} onDeleteJob={deleteJob} />
       )}
     </div>
+  );
+}
+
+export default function CalendarPage() {
+  return (
+    <GatewayConnectionProvider>
+      <_CalendarPageInner />
+    </GatewayConnectionProvider>
   );
 }

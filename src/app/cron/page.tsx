@@ -11,7 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
+import { GatewayConnectionProvider, useGatewayConnectionContext } from "@/lib/gateway/GatewayConnectionContext";
 
 /* ── Types ────────────────────────────────────────────────── */
 
@@ -376,7 +376,7 @@ function CronCreateForm({ onAdd }: { onAdd: (job: {
 
 /* ── Page ──────────────────────────────────────────────────── */
 
-export default function CronPage() {
+function _CronPageInner() {
   const { client, status } = useGatewayConnectionContext();
   const connected = status === "connected";
 
@@ -547,5 +547,13 @@ export default function CronPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CronPage() {
+  return (
+    <GatewayConnectionProvider>
+      <_CronPageInner />
+    </GatewayConnectionProvider>
   );
 }
